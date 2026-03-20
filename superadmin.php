@@ -62,6 +62,17 @@ if ($action === 'toggle_status') {
 } elseif ($action === 'edit_user') {
     $tid = (int)$_POST['user_id'];
     $pdo->prepare("UPDATE users SET name=?, email=?, phone=?, status=? WHERE id=?")->execute([trim($_POST['uname']), trim($_POST['uemail']), trim($_POST['uphone']), $_POST['ustatus'], $tid]);
+} elseif ($action === 'update_lead_status') {
+    $lid = (int)$_POST['lead_id']; $ns = $_POST['status'];
+    if ($lid && in_array($ns, ['new','open','claimed','lapsed','closed'])) {
+        $pdo->prepare("UPDATE public_leads SET status=? WHERE id=?")->execute([$ns, $lid]);
+    }
+} elseif ($action === 'assign_lead') {
+    $lid = (int)$_POST['lead_id']; $mid = (int)$_POST['member_id'];
+    if ($lid && $mid) {
+        $pdo->prepare("UPDATE public_leads SET status='claimed', claimed_by_member_id=?, claimed_at=NOW() WHERE id=?")->execute([$mid, $lid]);
+        try { sendNotification($pdo, $mid, "Lead Assigned by Admin", "A lead has been manually assigned to you.", 'crm'); } catch(Exception $e){}
+    }
 }
 
 $active_section = $_GET['s'] ?? 'dashboard';
@@ -96,6 +107,19 @@ $mwStr = implode(' AND ',$mwhere);
 $mq = $pdo->prepare("SELECT * FROM users WHERE $mwStr ORDER BY id DESC LIMIT $per_page OFFSET $offset");
 $mq->execute($mparams); $members = $mq->fetchAll(PDO::FETCH_ASSOC);
 $cq = $pdo->prepare("SELECT COUNT(*) FROM users WHERE $mwStr"); $cq->execute($mparams); $total_members_count = $cq->fetchColumn();
+
+// Leads (paginated + filtered)
+$leads_per_page = 50; $leads_page = max(1,(int)($_GET['lp']??1)); $l_offset = ($leads_page-1)*$leads_per_page;
+$lf_search = trim($_GET['lq']??''); $lf_status = trim($_GET['ls']??''); $lf_cat = trim($_GET['lc']??'');
+$lwhere = ["1=1"]; $lparams = [];
+if ($lf_search) { $lwhere[] = "(l.name LIKE ? OR l.email LIKE ? OR l.phone LIKE ? OR l.query LIKE ?)"; $lparams = array_merge($lparams, ["%$lf_search%","%$lf_search%","%$lf_search%","%$lf_search%"]); }
+if ($lf_status) { $lwhere[] = "l.status=?"; $lparams[] = $lf_status; }
+if ($lf_cat)    { $lwhere[] = "l.category=?"; $lparams[] = $lf_cat; }
+$lwStr = implode(' AND ',$lwhere);
+$lq = $pdo->prepare("SELECT l.*, u.name as claimed_by_name FROM public_leads l LEFT JOIN users u ON l.claimed_by_member_id=u.id WHERE $lwStr ORDER BY l.id DESC LIMIT $leads_per_page OFFSET $l_offset");
+$lq->execute($lparams); $all_leads = $lq->fetchAll(PDO::FETCH_ASSOC);
+$lcq = $pdo->prepare("SELECT COUNT(*) FROM public_leads WHERE $lwStr"); $lcq->execute($lparams); $total_leads_count = $lcq->fetchColumn();
+$lead_categories = $pdo->query("SELECT DISTINCT category FROM public_leads WHERE category!=''")->fetchAll(PDO::FETCH_COLUMN);
 
 $page_title = 'Super Admin -- BizNexus Control Center';
 require_once __DIR__ . '/includes/layout_start.php';
@@ -138,6 +162,7 @@ document.addEventListener('DOMContentLoaded', function() {
         {k:'dashboard',i:'[D]',l:'Dashboard'},
         {k:'members',  i:'[U]',l:'Members'},
         {k:'groups',   i:'[G]',l:'Groups'},
+        {k:'leads',    i:'[L]',l:'Leads Control'},
         {k:'badges',   i:'[A]',l:'Award Badges'},
         {k:'roles',    i:'[R]',l:'Assign Roles'},
         {k:'broadcast',i:'[B]',l:'Broadcast'},
@@ -420,6 +445,120 @@ while($rm = $rq->fetch(PDO::FETCH_ASSOC)): ?>
 </div>
 <?php endif; ?>
 
+<?php endif; ?>
+
+<?php if ($active_section === 'leads'): ?>
+<div class="sa-topbar">
+    <div><div class="sa-title">[L] Leads Control Center</div><div class="sa-subtitle"><?= $total_leads_count ?> total leads captured via AI Engine</div></div>
+</div>
+
+<!-- Leads Filters -->
+<form method="GET" style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+    <input type="hidden" name="s" value="leads">
+    <input type="text" name="lq" value="<?= htmlspecialchars($lf_search) ?>" placeholder="Search name, email, query..." style="background:#13131a;border:1px solid #2a2a3a;color:#fff;padding:8px 12px;border-radius:8px;flex:1;min-width:200px;">
+    <select name="ls" style="background:#13131a;border:1px solid #2a2a3a;color:#fff;padding:8px 12px;border-radius:8px;">
+        <option value="">All Status</option>
+        <option value="new" <?= $lf_status==='new'?'selected':'' ?>>New</option>
+        <option value="claimed" <?= $lf_status==='claimed'?'selected':'' ?>>Claimed</option>
+        <option value="closed" <?= $lf_status==='closed'?'selected':'' ?>>Closed</option>
+        <option value="lapsed" <?= $lf_status==='lapsed'?'selected':'' ?>>Lapsed</option>
+    </select>
+    <select name="lc" style="background:#13131a;border:1px solid #2a2a3a;color:#fff;padding:8px 12px;border-radius:8px;">
+        <option value="">All Categories</option>
+        <?php foreach($lead_categories as $cat): ?>
+        <option value="<?= htmlspecialchars($cat) ?>" <?= $lf_cat===$cat?'selected':'' ?>><?= htmlspecialchars($cat) ?></option>
+        <?php endforeach; ?>
+    </select>
+    <button type="submit" class="btn-gold" style="padding:8px 20px;">Filter</button>
+    <?php if($lf_search || $lf_status || $lf_cat): ?><a href="?s=leads" style="padding:8px 15px;background:#2a2a3a;color:#888;border-radius:8px;text-decoration:none;">Clear</a><?php endif; ?>
+</form>
+
+<div class="sa-table-wrap">
+<table class="sa-table">
+<thead><tr><th>ID</th><th>Lead Info</th><th>Details</th><th>Assigned To</th><th>Status</th><th>Actions</th></tr></thead>
+<tbody>
+<?php foreach($all_leads as $l): ?>
+<tr>
+    <td><?= $l['id'] ?></td>
+    <td>
+        <strong style="color:#e8e8f5;"><?= htmlspecialchars($l['name']) ?></strong><br>
+        <span style="font-size:.7rem;color:#8888aa;"><?= htmlspecialchars($l['phone']) ?> | <?= htmlspecialchars($l['email']) ?></span>
+    </td>
+    <td>
+        <div style="font-size:.75rem;color:#FFD700;"><?= htmlspecialchars($l['category']) ?> IN <?= htmlspecialchars($l['city']) ?></div>
+        <div style="font-size:.72rem;color:#888;max-width:250px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="<?= htmlspecialchars($l['query']) ?>"><?= htmlspecialchars($l['query']) ?></div>
+    </td>
+    <td>
+        <?php if($l['claimed_by_name']): ?>
+            <span style="color:#4488ff;"><?= htmlspecialchars($l['claimed_by_name']) ?></span>
+        <?php else: ?>
+            <span style="color:#666;">Unassigned</span>
+        <?php endif; ?>
+    </td>
+    <td><span class="pill <?= $l['status']==='claimed'?'pill-blue':($l['status']==='closed'?'pill-red':'pill-green') ?>"><?= ucfirst($l['status']) ?></span></td>
+    <td>
+        <div style="display:flex;gap:5px;">
+            <button onclick="openAssignModal(<?= $l['id'] ?>, '<?= htmlspecialchars($l['name']) ?>')" class="btn-gold" style="padding:4px 8px;font-size:.65rem;background:rgba(255,215,0,.15);">Assign</button>
+            <button onclick="openLeadStatusModal(<?= $l['id'] ?>, '<?= $l['status'] ?>')" style="background:rgba(255,255,255,.05);color:#fff;border:1px solid #2a2a3a;padding:4px 8px;border-radius:4px;font-size:.65rem;cursor:pointer;">Status</button>
+        </div>
+    </td>
+</tr>
+<?php endforeach; ?>
+</tbody>
+</table>
+</div>
+
+<!-- Leads Pagination -->
+<?php if($total_leads_count > $leads_per_page): ?>
+<div style="display:flex;gap:5px;margin-top:20px;justify-content:center;">
+    <?php for($i=1; $i<=ceil($total_leads_count/$leads_per_page); $i++): ?>
+    <a href="?s=leads&lp=<?= $i ?>&lq=<?= urlencode($lf_search) ?>&ls=<?= urlencode($lf_status) ?>&lc=<?= urlencode($lf_cat) ?>" style="padding:5px 10px;background:<?= $leads_page==$i?'#FFD700':'#13131a' ?>;color:<?= $leads_page==$i?'#000':'#888' ?>;border-radius:4px;text-decoration:none;font-size:.75rem;"><?= $i ?></a>
+    <?php endfor; ?>
+</div>
+<?php endif; ?>
+
+<!-- Assign Lead Modal -->
+<div id="assignModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;align-items:center;justify-content:center;">
+<div style="background:#13131a;border:1px solid #2a2a3a;border-radius:12px;padding:24px;width:380px;">
+    <h5 style="color:#FFD700;margin-bottom:4px;">Assign Lead</h5>
+    <p id="assignLeadName" style="color:#8888aa;font-size:.8rem;margin-bottom:20px;"></p>
+    <form method="POST">
+        <input type="hidden" name="action" value="assign_lead">
+        <input type="hidden" name="lead_id" id="assignLid">
+        <div class="mb-4">
+            <label style="color:#8883;font-size:.75rem;display:block;margin-bottom:8px;">Select Member</label>
+            <select name="member_id" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;width:100%;padding:10px;border-radius:8px;">
+                <?php foreach($all_users as $au): ?>
+                <option value="<?= $au['id'] ?>"><?= htmlspecialchars($au['name']) ?> (<?= htmlspecialchars($au['email']) ?>)</option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div style="display:flex;gap:8px;"><button type="submit" class="btn-gold" style="flex:1;">Assign Now</button><button type="button" onclick="document.getElementById('assignModal').style.display='none'" style="flex:1;background:#2a2a3a;color:#c0c0d8;border:none;border-radius:8px;">Cancel</button></div>
+    </form>
+</div>
+</div>
+
+<!-- Lead Status Modal -->
+<div id="leadStatusModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;align-items:center;justify-content:center;">
+<div style="background:#13131a;border:1px solid #2a2a3a;border-radius:12px;padding:24px;width:340px;">
+    <h5 style="color:#FFD700;margin-bottom:18px;">Update Lead Status</h5>
+    <form method="POST">
+        <input type="hidden" name="action" value="update_lead_status">
+        <input type="hidden" name="lead_id" id="statusLid">
+        <div class="mb-4">
+            <select name="status" id="statusSelect" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;width:100%;padding:10px;border-radius:8px;">
+                <option value="new">New / Open</option>
+                <option value="claimed">Claimed</option>
+                <option value="lapsed">Lapsed</option>
+                <option value="closed">Closed / Finished</option>
+            </select>
+        </div>
+        <div style="display:flex;gap:8px;"><button type="submit" class="btn-gold" style="flex:1;">Update</button><button type="button" onclick="document.getElementById('leadStatusModal').style.display='none'" style="flex:1;background:#2a2a3a;color:#c0c0d8;border:none;border-radius:8px;">Cancel</button></div>
+    </form>
+</div>
+</div>
+<?php endif; ?>
+
 <?php if ($active_section === 'agents'): ?>
 <div class="sa-topbar">
     <div><div class="sa-title">[A] Automation Agents</div><div class="sa-subtitle">Status of system background processes</div></div>
@@ -512,6 +651,16 @@ function openRoleModal(uid, name) {
     document.getElementById('roleModal').style.display = 'flex';
     document.getElementById('roleUid').value = uid;
     document.getElementById('roleMemberName').textContent = 'User: ' + name;
+}
+function openAssignModal(lid, name) {
+    document.getElementById('assignModal').style.display = 'flex';
+    document.getElementById('assignLid').value = lid;
+    document.getElementById('assignLeadName').textContent = 'Lead: ' + name;
+}
+function openLeadStatusModal(lid, curStatus) {
+    document.getElementById('leadStatusModal').style.display = 'flex';
+    document.getElementById('statusLid').value = lid;
+    document.getElementById('statusSelect').value = curStatus;
 }
 </script>
 

@@ -40,6 +40,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['claim_lead_id'])) {
     }
 }
 
+// ── Status update action ───────────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_lead_status'])) {
+    $lid = (int)$_POST['lead_id'];
+    $new_status = $_POST['status'];
+    try {
+        if ($new_status === 'open_pool') {
+            $pdo->prepare("UPDATE public_leads SET status='open', claimed_by=NULL, claimed_by_member_id=NULL, claimed_at=NULL WHERE id=? AND claimed_by_member_id=?")
+                ->execute([$lid, $uid]);
+            $msg = 'success:Lead released back to the open pool.';
+        } else if (in_array($new_status, ['open', 'closed', 'hold'])) {
+            $pdo->prepare("UPDATE public_leads SET status=? WHERE id=? AND claimed_by_member_id=?")
+                ->execute([$new_status, $lid, $uid]);
+            $msg = 'success:Lead status updated to ' . ucfirst($new_status) . '.';
+        }
+    } catch(Exception $e) { $msg = 'error:' . $e->getMessage(); }
+}
+
 // ── Filters ────────────────────────────────────────────────────────────────
 $f_city   = trim($_GET['city'] ?? '');
 $f_cat    = trim($_GET['category'] ?? '');
@@ -53,8 +70,15 @@ if ($f_status) { $where[] = "status = ?";         $params[] = $f_status; }
 if ($f_q)      { $where[] = "(name LIKE ? OR query LIKE ? OR intent LIKE ? OR category LIKE ?)"; $params = array_merge($params, ["%$f_q%","%$f_q%","%$f_q%","%$f_q%"]); }
 
 $wStr = implode(' AND ', $where);
-$stmt = $pdo->prepare("SELECT * FROM public_leads WHERE $wStr ORDER BY created_at DESC LIMIT 200");
-$stmt->execute($params);
+$view = $_GET['v'] ?? 'opps'; // 'opps' or 'pipeline'
+
+if ($view === 'pipeline') {
+    $stmt = $pdo->prepare("SELECT * FROM public_leads WHERE claimed_by_member_id = ? AND $wStr ORDER BY claimed_at DESC LIMIT 200");
+    $stmt->execute(array_merge([$uid], $params));
+} else {
+    $stmt = $pdo->prepare("SELECT * FROM public_leads WHERE (claimed_by_member_id IS NULL OR status IN ('new','open')) AND $wStr ORDER BY created_at DESC LIMIT 200");
+    $stmt->execute($params);
+}
 $leads = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // totals (unfiltered)
@@ -181,42 +205,12 @@ require_once __DIR__ . '/../includes/layout_start.php';
 </div>
 <?php endif; ?>
 
-<!-- ── Stats ── -->
-<div class="crm-stats">
-    <div class="crm-stat">
-        <div><div class="n" style="color:var(--gold);"><?= $total_all ?></div><div class="l">Total Leads</div></div>
-    </div>
-    <div class="crm-stat">
-        <div><div class="n" style="color:var(--green);"><?= $total_new ?></div><div class="l">Open / New</div></div>
-    </div>
-    <div class="crm-stat">
-        <div><div class="n" style="color:var(--blue);"><?= $total_claimed ?></div><div class="l">Claimed</div></div>
-    </div>
-    <div class="crm-stat">
-        <div><div class="n" style="color:#a259ff;"><?= $my_claimed ?></div><div class="l">My Claims</div></div>
-    </div>
-    <?php
-    $limit_display = $claim_limit === PHP_INT_MAX ? '∞' : $claim_limit;
-    $usage_pct = $claim_limit === PHP_INT_MAX ? 0 : min(100, round(($claims_this_month / $claim_limit) * 100));
-    $usage_color = $usage_pct >= 90 ? '#ff4d6d' : ($usage_pct >= 60 ? '#ffaa00' : '#00e87a');
-    ?>
-    <div class="crm-stat" style="border-color:<?= $usage_pct>=90?'rgba(255,77,109,.3)':'rgba(255,215,0,.1)' ?>;">
-        <div style="min-width:110px;">
-            <div style="display:flex;justify-content:space-between;align-items:baseline;">
-                <div class="n" style="color:<?= $usage_color ?>;"><?= $claims_this_month ?></div>
-                <div style="font-size:.78rem;color:var(--muted);">/ <?= $limit_display ?></div>
-            </div>
-            <div class="l">This Month (<?= ucfirst($user_plan) ?>)</div>
-            <div style="height:4px;background:#1a1a28;border-radius:2px;margin-top:6px;overflow:hidden;">
-                <div style="width:<?= $usage_pct ?>%;height:100%;background:<?= $usage_color ?>;border-radius:2px;transition:.5s;"></div>
-            </div>
-        </div>
-    </div>
-    <?php if (count($leads) !== $total_all): ?>
-    <div class="crm-stat">
-        <div><div class="n" style="color:var(--orange);"><?= count($leads) ?></div><div class="l">Filtered</div></div>
-    </div>
-    <?php endif; ?>
+</div>
+
+<!-- ── Tabs ── -->
+<div style="display:flex;gap:15px;margin-bottom:20px;border-bottom:1px solid var(--border);">
+    <a href="?v=opps" class="ref-tab <?= $view==='opps'?'active':'' ?>" style="padding:10px 5px;text-decoration:none;font-weight:700;font-size:.85rem;color:<?= $view==='opps'?'var(--gold)':'var(--muted)' ?>;border-bottom:2px solid <?= $view==='opps'?'var(--gold)':'transparent' ?>;">🟢 New Opportunities (<?= $total_new ?>)</a>
+    <a href="?v=pipeline" class="ref-tab <?= $view==='pipeline'?'active':'' ?>" style="padding:10px 5px;text-decoration:none;font-weight:700;font-size:.85rem;color:<?= $view==='pipeline'?'var(--gold)':'var(--muted)' ?>;border-bottom:2px solid <?= $view==='pipeline'?'var(--gold)':'transparent' ?>;">💼 My Pipeline (<?= $my_claimed ?>)</a>
 </div>
 
 <!-- ── Filters ── -->
@@ -305,15 +299,22 @@ require_once __DIR__ . '/../includes/layout_start.php';
     <!-- Footer -->
     <div class="lc-footer">
         <span class="lc-time">🕐 <?= date('d M Y, h:i A', strtotime($l['created_at'])) ?></span>
-        <?php if (in_array(strtolower($l['status']), ['new','open'])): ?>
+        <?php if ($view === 'opps'): ?>
             <form method="POST" style="margin:0;">
                 <input type="hidden" name="claim_lead_id" value="<?= $l['id'] ?>">
                 <button type="submit" class="btn-claim">🤝 Claim Lead</button>
             </form>
-        <?php elseif ($isMine): ?>
-            <span style="font-size:.78rem;color:var(--blue);font-weight:700;">✓ You claimed this</span>
         <?php else: ?>
-            <span style="font-size:.76rem;color:var(--muted);">Already claimed</span>
+            <form method="POST" style="margin:0;">
+                <input type="hidden" name="update_lead_status" value="1">
+                <input type="hidden" name="lead_id" value="<?= $l['id'] ?>">
+                <select name="status" onchange="this.form.submit()" style="background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);font-size:.75rem;padding:4px 8px;border-radius:6px;outline:none;">
+                    <option value="open"   <?= $l['status']==='open' || $l['status']==='claimed'?'selected':'' ?>>Open</option>
+                    <option value="hold"   <?= $l['status']==='hold'?'selected':'' ?>>On Hold</option>
+                    <option value="closed" <?= $l['status']==='closed'?'selected':'' ?>>Closed</option>
+                    <option value="open_pool" style="color:var(--red);">Release to Pool</option>
+                </select>
+            </form>
         <?php endif; ?>
     </div>
 

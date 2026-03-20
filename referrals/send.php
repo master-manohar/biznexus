@@ -77,7 +77,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
 
-            $successMessage = "Referral sent successfully! You earned 25 VooCoins.";
+            // $successMessage = "Referral sent successfully! You earned 25 VooCoins.";
+            header("Location: /referrals/list.php?ok=1");
+            exit;
         } catch (Exception $e) {
             $errorMessage = "Failed to send referral: " . $e->getMessage();
         }
@@ -130,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <nav class='nav flex-column' style='flex:1'>
         <a class='nav-link' href='/dashboard/index.php'>🏠 Dashboard</a>
         <a class='nav-link' href='/profile/edit.php'>👤 My Profile</a>
-        <a class='nav-link active' href='/referrals/send.php'>🤝 Referrals</a>
+        <a class='nav-link active' href='/referrals/list.php'>🤝 Referrals</a>
         <a class='nav-link' href='/meetings/book.php'>📅 Meetings</a>
         <a class='nav-link' href='/marketplace/index.php'>🏪 Marketplace</a>
         <a class='nav-link' href='/crm/index.php'>📊 CRM</a>
@@ -143,9 +145,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <a href='/auth/logout.php' style='color:#ff4455;padding:16px 20px; text-decoration: none;'>🚪 Logout</a>
 </div>
 
-<div class='main p-4'>
-    <h2 class="mb-4" style="font-family: 'Syne', sans-serif; font-weight: 800;">Send a Referral</h2>
-    <p class="mb-4" style="color: var(--text2);">Help other members grow and earn <strong style="color: var(--gold)">25 VooCoins</strong> for yourself.</p>
+    <div style="display:flex;justify-content:space-between;align-items:center;" class="mb-4">
+        <div>
+            <h2 style="font-family: 'Syne', sans-serif; font-weight: 800; margin:0;">Send a Referral</h2>
+            <p style="color: var(--text2); margin:5px 0 0;">Help other members grow and earn <strong style="color: var(--gold)">25 VooCoins</strong></p>
+        </div>
+        <a href="/referrals/list.php" class="btn btn-outline-secondary btn-sm" style="border-radius:8px;padding:8px 16px;">View My Referrals</a>
+    </div>
 
     <?php if ($successMessage): ?>
         <div class="alert alert-success" style="background: rgba(0, 255, 136, 0.1); color: #00ff88; border: 1px solid #00ff88;"><?= htmlspecialchars($successMessage) ?></div>

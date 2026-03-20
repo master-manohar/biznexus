@@ -109,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_lead'])) {
             $stmt->execute([$name, $phone, $email, $leadQuery, $leadCat, $leadCity]);
             $leadId = $pdo->lastInsertId();
 
-            // Find matching members
+            // Find matching members - Strictly Category-Based as per request
             $matchSql = "
                 SELECT u.id, u.name, u.email as user_email, u.plan, bp.business_name, bp.whatsapp, bp.category, bp.city,
                        (SELECT MAX(notified_at) FROM lead_dispatches WHERE member_id = u.id) as last_lead_time
@@ -118,29 +118,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_lead'])) {
                 WHERE u.status = 'active' AND bp.category = ?
             ";
             
-            $params = [$leadCat];
-            if (!empty($leadCity)) {
-                $matchSql .= " AND bp.city LIKE ?";
-                $params[] = "%$leadCity%";
-            }
-            
             $stmtMatching = $pdo->prepare($matchSql);
-            $stmtMatching->execute($params);
+            $stmtMatching->execute([$leadCat]);
             $allMatches = $stmtMatching->fetchAll(PDO::FETCH_ASSOC);
-
-            // if exact city matches fail, try category only (fallback)
-            if (empty($allMatches) && !empty($leadCity)) {
-                $fallbackSql = "
-                    SELECT u.id, u.name, u.email as user_email, u.plan, bp.business_name, bp.whatsapp, bp.category, bp.city,
-                           (SELECT MAX(notified_at) FROM lead_dispatches WHERE member_id = u.id) as last_lead_time
-                    FROM users u 
-                    JOIN business_profiles bp ON u.id = bp.user_id 
-                    WHERE u.status = 'active' AND bp.category = ?
-                ";
-                $stmtFallback = $pdo->prepare($fallbackSql);
-                $stmtFallback->execute([$leadCat]);
-                $allMatches = $stmtFallback->fetchAll(PDO::FETCH_ASSOC);
-            }
 
             // --- Slot Allocation Logic ---
             $matchedMembers = [];
