@@ -115,6 +115,8 @@ $mq->execute($mparams); $members = $mq->fetchAll(PDO::FETCH_ASSOC);
 $cq = $pdo->prepare("SELECT COUNT(*) FROM users WHERE $mwStr"); $cq->execute($mparams); $total_members_count = $cq->fetchColumn();
 
 // Leads (Unified: AI + Referrals)
+$leads_per_page = 50; 
+$leads_page = max(1, (int)($_GET['lp'] ?? 1));
 $lf_search = trim($_GET['lq']??''); $lf_status = trim($_GET['ls']??''); $lf_cat = trim($_GET['lc']??'');
 
 // 1. Build WHERE for public_leads
@@ -132,17 +134,18 @@ if ($lf_cat)    { $refWhere[] = "category=?"; $refParams[] = $lf_cat; }
 $refStr = implode(' AND ', $refWhere);
 
 $lq_str = "
-(SELECT id, 'AI Engine' as type, name, phone, email, category, city, query, claimed_by_member_id as assigned_to, status, assigned_at, recirc_count, 0 as deal_value, 'System' as given_by, 'AI Engine' as given_by_group, created_at
- FROM public_leads WHERE $plStr)
+SELECT id, 'AI Engine' as type, name, phone, email, category, city, query, claimed_by_member_id as assigned_to, status, assigned_at, recirc_count, 0 as deal_value, 'System' as given_by, 'AI Engine' as given_by_group, created_at
+ FROM public_leads WHERE $plStr
 UNION ALL
-(SELECT r.id, 'Referral' as type, r.referred_name as name, r.phone, r.email, r.category, '' as city, r.notes as query, r.receiver_id as assigned_to, r.status, r.assigned_at, r.recirc_count, r.estimated_value as deal_value, u.name as given_by, g.name as given_by_group, r.created_at
+SELECT r.id, 'Referral' as type, r.referred_name as name, r.phone, r.email, r.category, '' as city, r.notes as query, r.receiver_id as assigned_to, r.status, r.assigned_at, r.recirc_count, r.estimated_value as deal_value, u.name as given_by, g.name as given_by_group, r.created_at
  FROM referrals r LEFT JOIN users u ON r.sender_id = u.id LEFT JOIN groups g ON u.group_id = g.id
- WHERE $refStr)
+ WHERE $refStr
 ORDER BY created_at DESC LIMIT 100";
 
 $lq = $pdo->prepare($lq_str);
 $lq->execute(array_merge($plParams, $refParams));
 $all_leads = $lq->fetchAll(PDO::FETCH_ASSOC);
+$total_leads_count = count($all_leads);
 
 $lead_categories = $pdo->query("SELECT DISTINCT category FROM (SELECT category FROM public_leads UNION SELECT category FROM referrals) as t WHERE category!=''")->fetchAll(PDO::FETCH_COLUMN);
 
@@ -536,7 +539,6 @@ while($rm = $rq->fetch(PDO::FETCH_ASSOC)): ?>
 </tbody>
 </table>
 </div>
-<?php endif; ?>
 
 <!-- Leads Pagination -->
 <?php if($total_leads_count > $leads_per_page): ?>
@@ -684,23 +686,8 @@ function openRoleModal(uid, name) {
     document.getElementById('roleUid').value = uid;
     document.getElementById('roleMemberName').textContent = 'User: ' + name;
 }
-<!-- JS for Modals -->
-<script>
-function openAssignModal(id, type, name) {
-    document.getElementById('assignModal').style.display = 'flex';
-    document.getElementById('assignLid').value = id;
-    document.getElementById('assignType').value = type;
-    document.getElementById('assignLeadName').textContent = '[' + type + '] Lead: ' + name;
-}
-function openStatusModal(id, type, curStatus) {
-    document.getElementById('leadStatusModal').style.display = 'flex';
-    document.getElementById('statusLid').value = id;
-    document.getElementById('statusType').value = type;
-    document.getElementById('statusSelect').value = curStatus;
-}
 function closeAssignModal(){ document.getElementById('assignModal').style.display = 'none'; }
 function closeStatusModal(){ document.getElementById('leadStatusModal').style.display = 'none'; }
-</script>
 </script>
 
 <?php require_once __DIR__ . '/includes/layout_end.php'; ?>
