@@ -44,7 +44,7 @@ $query = "
 (SELECT l.id, 'AI Engine' as type, l.name, l.phone, l.email, l.category, l.city, l.query, l.claimed_by_member_id as assigned_to, l.status, l.assigned_at, l.recirc_count, 0 as deal_value, 'System' as given_by, 'AI Engine' as given_by_group, l.created_at
  FROM public_leads l WHERE $lwStr)
 UNION ALL
-(SELECT r.id, 'Referral' as type, r.referred_name as name, r.referred_phone as phone, r.referred_email as email, r.category, '' as city, r.notes as query, r.receiver_id as assigned_to, r.status, r.assigned_at, r.recirc_count, r.estimated_value as deal_value, u_sender.name as given_by, g.name as given_by_group, r.created_at
+(SELECT r.id, 'Referral' as type, r.referred_name as name, r.phone, r.email, r.category, '' as city, r.notes as query, r.receiver_id as assigned_to, r.status, r.assigned_at, r.recirc_count, r.estimated_value as deal_value, u_sender.name as given_by, g.name as given_by_group, r.created_at
  FROM referrals r 
  LEFT JOIN users u_sender ON r.sender_id = u_sender.id
  LEFT JOIN groups g ON u_sender.group_id = g.id
@@ -116,7 +116,7 @@ require_once __DIR__ . '/includes/layout_start.php';
                 </td>
                 <td style="padding:15px;">
                     <?php if($l['assigned_to']): ?>
-                        <?php 
+                        <?php
                         $mStmt = $pdo->prepare("SELECT name FROM users WHERE id = ?");
                         $mStmt->execute([$l['assigned_to']]);
                         $mName = $mStmt->fetchColumn();

@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->beginTransaction();
             
             // Insert referral
-            $stmt = $pdo->prepare("INSERT INTO referrals (sender_id, receiver_id, category, referred_name, referred_phone, referred_email, notes, estimated_value, status, created_at, assigned_at) 
+            $stmt = $pdo->prepare("INSERT INTO referrals (sender_id, receiver_id, category, referred_name, phone, email, notes, estimated_value, status, created_at, assigned_at) 
                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', NOW(), NOW())");
             $stmt->execute([$uid, $receiver_id, $cat, $r_name, $r_phone, $r_email, $r_notes, $val]);
             $rid = $pdo->lastInsertId();
