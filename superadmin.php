@@ -81,7 +81,7 @@ if ($action === 'toggle_status') {
     }
 }
 
-$active_section = $_GET['s'] ?? 'dashboard';
+$active_section = $_GET['s'] ?? 'leads';
 
 // -- Data ----------------------------------------------------------------------------------------
 $stats = [
