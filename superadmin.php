@@ -118,7 +118,7 @@ if ($lf_cat)    { $lwhere[] = "l.category=?"; $lparams[] = $lf_cat; }
 $lwStr = implode(' AND ',$lwhere);
 $lq = $pdo->prepare("SELECT l.*, u.name as claimed_by_name FROM public_leads l LEFT JOIN users u ON l.claimed_by_member_id=u.id WHERE $lwStr ORDER BY l.id DESC LIMIT $leads_per_page OFFSET $l_offset");
 $lq->execute($lparams); $all_leads = $lq->fetchAll(PDO::FETCH_ASSOC);
-$lcq = $pdo->prepare("SELECT COUNT(*) FROM public_leads WHERE $lwStr"); $lcq->execute($lparams); $total_leads_count = $lcq->fetchColumn();
+$lcq = $pdo->prepare("SELECT COUNT(*) FROM public_leads l WHERE $lwStr"); $lcq->execute($lparams); $total_leads_count = $lcq->fetchColumn();
 $lead_categories = $pdo->query("SELECT DISTINCT category FROM public_leads WHERE category!=''")->fetchAll(PDO::FETCH_COLUMN);
 
 $page_title = 'Super Admin -- BizNexus Control Center';
