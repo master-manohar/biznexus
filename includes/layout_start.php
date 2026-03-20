@@ -140,6 +140,10 @@ $my_role_info = $role_icons[$group_role] ?? $role_icons['member'];
             <span class="nav-emoji">💼</span>
             <span class="nav-label">CRM Pipeline</span>
         </a>
+        <a href="/superadmin.php" class="sidebar-link">
+            <span class="nav-emoji">🚀</span>
+            <span class="nav-label">Leads Command Center</span>
+        </a>
         <a href="/profile/edit.php" class="sidebar-link <?= $active_profile ?>">
             <span class="nav-emoji">👤</span>
             <span class="nav-label">Profile</span>
@@ -147,6 +151,10 @@ $my_role_info = $role_icons[$group_role] ?? $role_icons['member'];
         <a href="/referrals/list.php" class="sidebar-link <?= $active_ref ?>">
             <span class="nav-emoji">🤝</span>
             <span class="nav-label">Referrals</span>
+        </a>
+        <a href="/referrals/send.php" class="sidebar-link">
+            <span class="nav-emoji">⚡</span>
+            <span class="nav-label">Give a Referral</span>
         </a>
         <a href="/marketplace/list.php" class="sidebar-link <?= $active_market ?>">
             <span class="nav-emoji">🛒</span>
