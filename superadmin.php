@@ -117,20 +117,38 @@ $cq = $pdo->prepare("SELECT COUNT(*) FROM users WHERE $mwStr"); $cq->execute($mp
 // Leads (Unified: AI + Referrals)
 $leads_per_page = 50; 
 $leads_page = max(1, (int)($_GET['lp'] ?? 1));
-$lf_search = trim($_GET['lq']??''); $lf_status = trim($_GET['ls']??''); $lf_cat = trim($_GET['lc']??'');
+$lf_search = trim($_GET['lq']??''); 
+$lf_status = trim($_GET['ls']??''); 
+$lf_cat = trim($_GET['lc']??'');
+$lf_source = trim($_GET['lsrc']??'');
+$lf_assignee = (int)($_GET['lmid']??0);
+$lf_min_val = (int)($_GET['lmv']??0);
+
+// Status Mapping Logic
+$status_map = [
+    'open'    => ['new', 'sent'],
+    'claimed' => ['claimed', 'accepted', 'meeting_done', 'deal_in_progress'],
+    'closed'  => ['closed', 'closed_won'],
+    'lapsed'  => ['lapsed', 'closed_lost']
+];
 
 // 1. Build WHERE for public_leads
 $plWhere = ["1=1"]; $plParams = [];
-if ($lf_search) { $plWhere[] = "(name LIKE ? OR email LIKE ? OR phone LIKE ? OR category LIKE ?)"; $plParams = array_merge($plParams, ["%$lf_search%","%$lf_search%","%$lf_search%","%$lf_search%"]); }
-if ($lf_status) { $plWhere[] = "status=?"; $plParams[] = $lf_status; }
-if ($lf_cat)    { $plWhere[] = "category=?"; $plParams[] = $lf_cat; }
+if ($lf_search) { $plWhere[] = "(CAST(name AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ? OR CAST(email AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ? OR CAST(phone AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ? OR CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ?)"; $plParams = array_merge($plParams, ["%$lf_search%","%$lf_search%","%$lf_search%","%$lf_search%"]); }
+if ($lf_status && isset($status_map[$lf_status])) { $plWhere[] = "status IN (".implode(',', array_fill(0, count($status_map[$lf_status]), '?')).")"; $plParams = array_merge($plParams, $status_map[$lf_status]); }
+if ($lf_cat)    { $plWhere[] = "CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci = ?"; $plParams[] = $lf_cat; }
+if ($lf_source === 'referral') { $plWhere[] = "0=1"; } // Hide AI leads if source=referral
+if ($lf_assignee) { $plWhere[] = "claimed_by_member_id = ?"; $plParams[] = $lf_assignee; }
 $plStr = implode(' AND ', $plWhere);
 
 // 2. Build WHERE for referrals
 $refWhere = ["1=1"]; $refParams = [];
-if ($lf_search) { $refWhere[] = "(referred_name LIKE ? OR email LIKE ? OR phone LIKE ? OR category LIKE ?)"; $refParams = array_merge($refParams, ["%$lf_search%","%$lf_search%","%$lf_search%","%$lf_search%"]); }
-if ($lf_status) { $refWhere[] = "status=?"; $refParams[] = $lf_status; }
-if ($lf_cat)    { $refWhere[] = "category=?"; $refParams[] = $lf_cat; }
+if ($lf_search) { $refWhere[] = "(CAST(referred_name AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ? OR CAST(email AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ? OR CAST(phone AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ? OR CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ?)"; $refParams = array_merge($refParams, ["%$lf_search%","%$lf_search%","%$lf_search%","%$lf_search%"]); }
+if ($lf_status && isset($status_map[$lf_status])) { $refWhere[] = "status IN (".implode(',', array_fill(0, count($status_map[$lf_status]), '?')).")"; $refParams = array_merge($refParams, $status_map[$lf_status]); }
+if ($lf_cat)    { $refWhere[] = "CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci = ?"; $refParams[] = $lf_cat; }
+if ($lf_source === 'ai') { $refWhere[] = "0=1"; } // Hide referrals if source=ai
+if ($lf_assignee) { $refWhere[] = "receiver_id = ?"; $refParams[] = $lf_assignee; }
+if ($lf_min_val) { $refWhere[] = "estimated_value >= ?"; $refParams[] = $lf_min_val; }
 $refStr = implode(' AND ', $refWhere);
 
 $lq_str = "
@@ -172,6 +190,15 @@ $lq = $pdo->prepare($lq_str);
 $lq->execute(array_merge($plParams, $refParams));
 $all_leads = $lq->fetchAll(PDO::FETCH_ASSOC);
 $total_leads_count = count($all_leads);
+
+// Summary Counts
+$sum_open = 0; $sum_claimed = 0; $sum_closed = 0; $total_value = 0;
+foreach($all_leads as $sl) {
+    if (in_array($sl['status'], $status_map['open'])) $sum_open++;
+    elseif (in_array($sl['status'], $status_map['claimed'])) $sum_claimed++;
+    elseif (in_array($sl['status'], $status_map['closed'])) $sum_closed++;
+    $total_value += $sl['deal_value'];
+}
 
 $lead_categories = $pdo->query("SELECT DISTINCT category FROM (SELECT CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci as category FROM public_leads UNION SELECT CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci FROM referrals) as t WHERE category!=''")->fetchAll(PDO::FETCH_COLUMN);
 
@@ -501,30 +528,68 @@ while($rm = $rq->fetch(PDO::FETCH_ASSOC)): ?>
 
 <?php if ($active_section === 'leads'): ?>
 <div class="sa-topbar">
-    <div><div class="sa-title">[L] Leads Command Center</div><div class="sa-subtitle">Unified visibility for all AI Leads & Member Referrals</div></div>
+    <div><div class="sa-title">[L] Leads Command Center</div><div class="sa-subtitle">Managing AI Insights & Member-to-Member Referrals</div></div>
 </div>
 
-<form method="GET" style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;">
+<!-- Leads Summary Stats -->
+<div class="stat-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 25px;">
+    <div class="stat-card" style="border-top: 3px solid #4488ff;"><div class="s-num" style="color:#4488ff;"><?= $sum_open ?></div><div class="s-lbl">Open / Sent</div></div>
+    <div class="stat-card" style="border-top: 3px solid #00e87a;"><div class="s-num" style="color:#00e87a;"><?= $sum_claimed ?></div><div class="s-lbl">In Progress</div></div>
+    <div class="stat-card" style="border-top: 3px solid #ff4d6d;"><div class="s-num" style="color:#ff4d6d;"><?= $sum_closed ?></div><div class="s-lbl">Closed / Won</div></div>
+    <div class="stat-card" style="border-top: 3px solid #FFD700;"><div class="s-num" style="color:#FFD700;">₹<?= number_format($total_value) ?></div><div class="s-lbl">Total Value (in view)</div></div>
+</div>
+
+<form method="GET" style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;background:rgba(255,255,255,.03);padding:15px;border-radius:10px;border:1px solid #2a2a3a;">
     <input type="hidden" name="s" value="leads">
-    <input type="text" name="lq" value="<?= htmlspecialchars($lf_search) ?>" placeholder="Search name, phone, etc..." style="background:#13131a;border:1px solid #2a2a3a;color:#fff;padding:8px 12px;border-radius:8px;flex:1;min-width:200px;">
-    <select name="ls" style="background:#13131a;border:1px solid #2a2a3a;color:#fff;padding:8px 12px;border-radius:8px;">
-        <option value="">All Status</option>
-        <option value="new" <?= $lf_status==='new'?'selected':'' ?>>New</option>
-        <option value="claimed" <?= $lf_status==='claimed'?'selected':'' ?>>Claimed</option>
-        <option value="closed" <?= $lf_status==='closed'?'selected':'' ?>>Closed</option>
-    </select>
-    <select name="lc" style="background:#13131a;border:1px solid #2a2a3a;color:#fff;padding:8px 12px;border-radius:8px;">
-        <option value="">All Categories</option>
-        <?php foreach($lead_categories as $cat): ?>
-        <option value="<?= htmlspecialchars($cat) ?>" <?= $lf_cat===$cat?'selected':'' ?>><?= htmlspecialchars($cat) ?></option>
-        <?php endforeach; ?>
-    </select>
-    <button type="submit" class="btn-gold" style="padding:8px 20px;">Filter</button>
+    <div style="flex:1;min-width:180px;">
+        <label style="font-size:.65rem;color:#666;display:block;margin-bottom:3px;">Search Lead</label>
+        <input type="text" name="lq" value="<?= htmlspecialchars($lf_search) ?>" placeholder="Name, phone, email..." style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;padding:8px 12px;border-radius:8px;width:100%;">
+    </div>
+    <div style="width:120px;">
+        <label style="font-size:.65rem;color:#666;display:block;margin-bottom:3px;">Source</label>
+        <select name="lsrc" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;padding:8px 12px;border-radius:8px;width:100%;">
+            <option value="">All Sources</option>
+            <option value="ai" <?= $lf_source==='ai'?'selected':'' ?>>AI Engine</option>
+            <option value="referral" <?= $lf_source==='referral'?'selected':'' ?>>Referral</option>
+        </select>
+    </div>
+    <div style="width:150px;">
+        <label style="font-size:.65rem;color:#666;display:block;margin-bottom:3px;">Assignee</label>
+        <select name="lmid" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;padding:8px 12px;border-radius:8px;width:100%;">
+            <option value="0">All Members</option>
+            <?php foreach($all_users as $u): ?>
+            <option value="<?= $u['id'] ?>" <?= $lf_assignee==$u['id']?'selected':'' ?>><?= htmlspecialchars($u['name']) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <div style="width:140px;">
+        <label style="font-size:.65rem;color:#666;display:block;margin-bottom:3px;">Category</label>
+        <select name="lc" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;padding:8px 12px;border-radius:8px;width:100%;">
+            <option value="">All Categories</option>
+            <?php foreach($lead_categories as $cat): ?>
+            <option value="<?= htmlspecialchars($cat) ?>" <?= $lf_cat===$cat?'selected':'' ?>><?= htmlspecialchars($cat) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <div style="width:130px;">
+        <label style="font-size:.65rem;color:#666;display:block;margin-bottom:3px;">Status</label>
+        <select name="ls" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;padding:8px 12px;border-radius:8px;width:100%;">
+            <option value="">All Status</option>
+            <option value="open" <?= $lf_status==='open'?'selected':'' ?>>Open / Sent</option>
+            <option value="claimed" <?= $lf_status==='claimed'?'selected':'' ?>>In Progress</option>
+            <option value="closed" <?= $lf_status==='closed'?'selected':'' ?>>Closed / Won</option>
+            <option value="lapsed" <?= $lf_status==='lapsed'?'selected':'' ?>>Lapsed / Lost</option>
+        </select>
+    </div>
+    <div style="display:flex;align-items:flex-end;gap:8px;">
+        <button type="submit" class="btn-gold" style="padding:8px 20px;">Apply</button>
+        <a href="?s=leads" style="background:#2a2a3a;color:#888;padding:8px 15px;border-radius:8px;text-decoration:none;font-size:.8rem;">Reset</a>
+    </div>
 </form>
 
 <div class="sa-table-wrap">
 <table class="sa-table">
-<thead><tr><th>Source</th><th>Lead Info</th><th>Details</th><th>Assigned To</th><th>Value (₹)</th><th>Status</th><th>Actions</th></tr></thead>
+<thead><tr><th>Source</th><th>Lead Info</th><th>Details</th><th>Assigned To & Group</th><th>Value (₹)</th><th>Status</th><th>Actions</th></tr></thead>
 <tbody>
 <?php foreach($all_leads as $l): ?>
 <tr>
@@ -542,8 +607,9 @@ while($rm = $rq->fetch(PDO::FETCH_ASSOC)): ?>
     </td>
     <td>
         <?php if($l['assigned_to']): 
-            $mStmt = $pdo->prepare("SELECT name FROM users WHERE id = ?"); $mStmt->execute([$l['assigned_to']]); $mName = $mStmt->fetchColumn(); ?>
-            <span style="color:#00e87a;font-weight:600;"><?= htmlspecialchars($mName) ?></span>
+            $mStmt = $pdo->prepare("SELECT u.name, g.name as gname FROM users u LEFT JOIN groups g ON u.group_id=g.id WHERE u.id = ?"); $mStmt->execute([$l['assigned_to']]); $m = $mStmt->fetch(PDO::FETCH_ASSOC); ?>
+            <span style="color:#00e87a;font-weight:600;"><?= htmlspecialchars($m['name']??'Unknown') ?></span>
+            <div style="font-size:.68rem;color:#68688a;"><?= htmlspecialchars($m['gname'] ?? '-- No Group --') ?></div>
             <div style="font-size:.6rem;color:#444;"><?= $l['assigned_at'] ? date('d M, H:i', strtotime($l['assigned_at'])) : '--' ?></div>
             <?php if($l['recirc_count'] > 0): ?><div style="font-size:.6rem;color:#ff4d6d;">🔄 Re: <?= $l['recirc_count'] ?></div><?php endif; ?>
         <?php else: ?>
@@ -553,7 +619,14 @@ while($rm = $rq->fetch(PDO::FETCH_ASSOC)): ?>
     <td style="font-weight:700;color:<?= $l['deal_value']>0?'#FFD700':'#444' ?>;">
         <?= $l['deal_value'] > 0 ? '₹' . number_format($l['deal_value']) : '--' ?>
     </td>
-    <td><span class="pill <?= $l['status']==='claimed'?'pill-blue':($l['status']==='closed'?'pill-red':'pill-green') ?>"><?= ucfirst($l['status']) ?></span></td>
+    <td>
+        <?php 
+        $disp_st = 'Open'; 
+        foreach($status_map as $smk=>$smv) { if(in_array($l['status'],$smv)) $disp_st = ucfirst($smk); }
+        $st_col = $disp_st==='Open'?'#4488ff':($disp_st==='Claimed'?'#00e87a':($disp_st==='Closed'?'#ff4d6d':'#888'));
+        ?>
+        <span class="pill" style="background:<?= $st_col ?>22;color:<?= $st_col ?>;border-color:<?= $st_col ?>44;"><?= $disp_st ?></span>
+    </td>
     <td>
         <div style="display:flex;gap:5px;">
             <button onclick="openAssignModal(<?= $l['id'] ?>, '<?= $l['type'] ?>', '<?= htmlspecialchars($l['name']) ?>')" class="btn-gold" style="padding:4px 8px;font-size:.65rem;">Assign</button>
@@ -567,11 +640,9 @@ while($rm = $rq->fetch(PDO::FETCH_ASSOC)): ?>
 </div>
 
 <!-- Leads Pagination -->
-<?php if($total_leads_count > $leads_per_page): ?>
-<div style="display:flex;gap:5px;margin-top:20px;justify-content:center;">
-    <?php for($i=1; $i<=ceil($total_leads_count/$leads_per_page); $i++): ?>
-    <a href="?s=leads&lp=<?= $i ?>&lq=<?= urlencode($lf_search) ?>&ls=<?= urlencode($lf_status) ?>&lc=<?= urlencode($lf_cat) ?>" style="padding:5px 10px;background:<?= $leads_page==$i?'#FFD700':'#13131a' ?>;color:<?= $leads_page==$i?'#000':'#888' ?>;border-radius:4px;text-decoration:none;font-size:.75rem;"><?= $i ?></a>
-    <?php endfor; ?>
+<?php if($total_leads_count >= 100): ?>
+<div style="text-align:center;padding:20px;color:#666;font-size:.8rem;">
+    Displaying latest 100 leads. Refine search to see more results.
 </div>
 <?php endif; ?>
 
@@ -606,10 +677,20 @@ while($rm = $rq->fetch(PDO::FETCH_ASSOC)): ?>
         <input type="hidden" name="lead_id" id="statusLid">
         <div class="mb-4">
             <select name="status" id="statusSelect" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;width:100%;padding:10px;border-radius:8px;">
-                <option value="new">New / Open</option>
-                <option value="claimed">Claimed</option>
-                <option value="lapsed">Lapsed</option>
-                <option value="closed">Closed / Finished</option>
+                <optgroup label="AI Engine States">
+                    <option value="new">New</option>
+                    <option value="claimed">Claimed</option>
+                    <option value="closed">Closed / Finished</option>
+                    <option value="lapsed">Lapsed</option>
+                </optgroup>
+                <optgroup label="Referral States">
+                    <option value="sent">Sent</option>
+                    <option value="accepted">Accepted</option>
+                    <option value="meeting_done">Meeting Done</option>
+                    <option value="deal_in_progress">Deal In Progress</option>
+                    <option value="closed_won">Closed Won</option>
+                    <option value="closed_lost">Closed Lost</option>
+                </optgroup>
             </select>
             <input type="hidden" name="type" id="statusType">
         </div>
