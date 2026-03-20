@@ -1,0 +1,342 @@
+:root {
+    --bg-dark: #0a0a0f;
+    --card-dark: #13131a;
+    --gold: #FFD700;
+    --green: #00ff88;
+    --sidebar-width: 250px;
+    --border-color: #2a2a3a;
+    --text-muted-custom: #8888aa;
+    --text-primary: #e8e8f5;
+    --text-secondary: #c0c0d8;
+}
+
+/* ========== TOP NAVBAR ========== */
+.top-navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: var(--card-dark);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    z-index: 1000;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.4);
+}
+
+.navbar-brand-custom {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+}
+
+.brand-logo {
+    width: 38px;
+    height: 38px;
+    background: linear-gradient(135deg, var(--gold), #ff8c00);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 900;
+    font-size: 18px;
+    color: #0a0a0f;
+}
+
+.brand-text {
+    font-size: 20px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--gold), #ff8c00);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.navbar-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+/* ====== MEMBER NAME - FIXED VISIBILITY ====== */
+.member-name-display {
+    font-size: 14px;
+    font-weight: 600;
+    color: #e0e0f0 !important;
+    letter-spacing: .2px;
+}
+
+.coin-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 215, 0, 0.1);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    border-radius: 25px;
+    padding: 6px 16px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.coin-badge:hover {
+    background: rgba(255, 215, 0, 0.2);
+    border-color: var(--gold);
+}
+
+.coin-badge .coin-icon {
+    font-size: 18px;
+}
+
+.coin-badge .coin-amount {
+    color: var(--gold);
+    font-weight: 700;
+    font-size: 15px;
+}
+
+.member-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6c63ff, #4834d4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 15px;
+    color: white;
+    cursor: pointer;
+    border: 2px solid var(--border-color);
+    transition: border-color 0.3s;
+}
+
+.member-avatar:hover {
+    border-color: var(--gold);
+}
+
+.notification-bell {
+    position: relative;
+    cursor: pointer;
+    color: #c0c0d8;
+    font-size: 20px;
+    transition: color 0.3s;
+}
+
+.notification-bell:hover {
+    color: var(--gold);
+}
+
+.notif-dot {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    width: 10px;
+    height: 10px;
+    background: #ff4444;
+    border-radius: 50%;
+    border: 2px solid var(--card-dark);
+}
+
+/* ========== SIDEBAR ========== */
+.sidebar {
+    position: fixed;
+    top: 64px;
+    left: 0;
+    width: var(--sidebar-width);
+    height: calc(100vh - 64px);
+    background: var(--card-dark);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    z-index: 900;
+    transition: transform 0.3s ease;
+}
+
+.sidebar-nav {
+    padding: 16px 0;
+    flex: 1;
+}
+
+.sidebar-section-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #666688;
+    padding: 12px 20px 6px;
+}
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 20px;
+    color: #b8b8d0;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s;
+    border-left: 3px solid transparent;
+}
+
+.sidebar-link:hover {
+    background: rgba(255, 215, 0, 0.05);
+    color: #e8e8f5;
+    border-left-color: rgba(255, 215, 0, 0.4);
+}
+
+.sidebar-link.active {
+    background: rgba(255, 215, 0, 0.08);
+    color: var(--gold);
+    border-left-color: var(--gold);
+}
+
+.sidebar-link .nav-emoji {
+    font-size: 18px;
+    width: 24px;
+    text-align: center;
+}
+
+.sidebar-link .nav-label {
+    flex: 1;
+}
+
+.sidebar-link .nav-badge {
+    background: var(--gold);
+    color: #0a0a0f;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+}
+
+.sidebar-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 10px 16px;
+}
+
+.sidebar-logout {
+    padding: 16px;
+    border-top: 1px solid var(--border-color);
+}
+
+.logout-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 14px;
+    background: rgba(255, 68, 68, 0.08);
+    border: 1px solid rgba(255, 68, 68, 0.2);
+    border-radius: 10px;
+    color: #ff6b6b;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.logout-btn:hover {
+    background: rgba(255, 68, 68, 0.15);
+    border-color: #ff4444;
+    color: #ff4444;
+}
+
+/* ========== MAIN CONTENT ========== */
+.main-content {
+    margin-left: var(--sidebar-width);
+    margin-top: 64px;
+    padding: 28px;
+    min-height: calc(100vh - 64px);
+}
+
+/* =============================================
+   GLOBAL DARK THEME VISIBILITY OVERRIDES
+   Fixes all Bootstrap classes that look
+   invisible on dark (#0a0a0f) backgrounds
+   ============================================= */
+
+body { color: #c8c8e0; background: #0a0a0f; }
+
+/* Headings — always bright */
+h1,h2,h3,h4,h5,h6,
+.h1,.h2,.h3,.h4,.h5,.h6 { color: #e8e8f5 !important; }
+
+/* Bootstrap muted/secondary overrides */
+.text-muted           { color: #9090b8 !important; }
+.text-secondary       { color: #9898bc !important; }
+.small, small         { color: #9090b8 !important; }
+.tiny                 { color: #8888aa !important; font-size: .72rem; }
+
+/* Labels and paragraphs */
+label                 { color: #c8c8e0 !important; }
+p                     { color: #c0c0d8; }
+
+/* Cards — make sure card text is visible */
+.card                 { background: #13131a !important; border-color: #1e1e2e !important; }
+.card-body            { color: #c8c8e0 !important; }
+.card-title           { color: #e8e8f5 !important; }
+.card-text            { color: #c0c0d8 !important; }
+
+/* Bootstrap table */
+.table                { color: #c0c0d8 !important; --bs-table-color: #c0c0d8; }
+.table th             { color: #9090b8 !important; font-size:.75rem; text-transform:uppercase; letter-spacing:1px; }
+.table td             { color: #c0c0d8 !important; }
+.table-striped>tbody>tr:nth-of-type(odd)>* { --bs-table-accent-bg: rgba(255,255,255,0.02); }
+
+/* Bootstrap forms */
+.form-control, .form-select {
+    background: #0d0d16 !important;
+    border-color: #2a2a3a !important;
+    color: #e8e8f5 !important;
+}
+.form-control:focus, .form-select:focus {
+    border-color: var(--gold) !important;
+    box-shadow: 0 0 0 2px rgba(255,215,0,0.12) !important;
+    color: #e8e8f5 !important;
+    background: #0d0d16 !important;
+}
+.form-control::placeholder { color: #555577 !important; }
+.form-label            { color: #c8c8e0 !important; }
+
+/* Notification cards specifically */
+.notification-list .card { background: #13131a !important; }
+.notification-list h6     { color: #e8e8f5 !important; }
+.notification-list p,
+.notification-list .text-secondary,
+.notification-list .small { color: #a8a8cc !important; }
+
+/* Dashboard network/feed items */
+.feed-item, .network-item { color: #c0c0d8 !important; }
+.feed-item .fw-bold,
+.network-item .fw-bold   { color: #e8e8f5 !important; }
+.feed-item small,
+.network-item small      { color: #9090b8 !important; }
+
+/* Badge text */
+.badge { font-size: .7rem; }
+
+/* Alert boxes */
+.alert { color: #e8e8f5 !important; }
+
+@media (max-width: 992px) {
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); }
+    .main-content { margin-left: 0; }
+}
+
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 850;
+}
+
+.sidebar-overlay.active { display: block; }

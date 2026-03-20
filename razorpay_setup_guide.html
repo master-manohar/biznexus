@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Razorpay API Setup Guide — BizNexus</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+  body { background: #0a0a0f; color: #d0d0e8; min-height: 100vh; padding: 30px 20px; }
+  .container { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 1.8rem; color: #FFD700; font-weight: 800; margin-bottom: 6px; }
+  .sub { color: #8888aa; font-size: .9rem; margin-bottom: 30px; }
+
+  .step { background: #13131a; border: 1px solid #1e1e2e; border-radius: 14px; padding: 22px 24px; margin-bottom: 16px; position: relative; }
+  .step-num { position: absolute; top: -14px; left: 20px; background: #FFD700; color: #000; font-weight: 800; font-size: .75rem; border-radius: 20px; padding: 3px 12px; }
+  .step h3 { color: #e8e8f5; font-size: 1rem; font-weight: 700; margin-bottom: 10px; margin-top: 4px; }
+  .step p, .step li { font-size: .88rem; color: #c0c0d8; line-height: 1.7; }
+  .step ul, .step ol { padding-left: 20px; margin-top: 6px; }
+  .step li { margin-bottom: 4px; }
+
+  .highlight { background: #0d0d16; border: 1px solid #2a2a3a; border-radius: 8px; padding: 12px 16px; margin-top: 10px; font-family: monospace; font-size: .87rem; }
+  .key-name { color: #FFD700; font-weight: 700; display: block; margin-bottom: 4px; }
+  .key-val { color: #00e87a; }
+  .key-placeholder { color: #9090b8; font-style: italic; }
+
+  .warning { background: rgba(255,170,0,.08); border: 1px solid rgba(255,170,0,.25); border-radius: 8px; padding: 12px 16px; margin-top: 12px; font-size: .84rem; color: #ffaa00; }
+  .tip { background: rgba(0,232,122,.07); border: 1px solid rgba(0,232,122,.2); border-radius: 8px; padding: 12px 16px; margin-top: 12px; font-size: .84rem; color: #00e87a; }
+
+  .btn-link { display: inline-block; padding: 9px 20px; background: linear-gradient(135deg, #FFD700, #ff8c00); color: #000; font-weight: 700; border-radius: 8px; text-decoration: none; font-size: .85rem; margin-top: 12px; }
+  .nav-path { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  .nav-step { background: #0d0d16; border: 1px solid #2a2a3a; border-radius: 6px; padding: 4px 10px; font-size: .78rem; color: #c0c0d8; }
+  .nav-arrow { color: #FFD700; font-size: .9rem; }
+
+  .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  @media(max-width:600px) { .input-row { grid-template-columns: 1fr; } }
+  .input-box { background: #0d0d16; border: 1px solid #2a2a3a; border-radius: 8px; padding: 12px 14px; }
+  .input-box label { font-size: .72rem; color: #8888aa; text-transform: uppercase; letter-spacing: .8px; display: block; margin-bottom: 6px; }
+  .input-box input { background: transparent; border: none; color: #FFD700; font-family: monospace; font-size: .9rem; width: 100%; outline: none; }
+
+  code { background: #0d0d16; border: 1px solid #2a2a3a; border-radius: 4px; padding: 2px 7px; font-size: .82rem; color: #FFD700; }
+
+  .badge-live { display: inline-block; padding: 2px 8px; background: rgba(0,232,122,.15); border: 1px solid rgba(0,232,122,.3); color: #00e87a; border-radius: 20px; font-size: .7rem; font-weight: 700; }
+  .badge-test { display: inline-block; padding: 2px 8px; background: rgba(255,170,0,.12); border: 1px solid rgba(255,170,0,.25); color: #ffaa00; border-radius: 20px; font-size: .7rem; font-weight: 700; }
+
+  .final-box { background: linear-gradient(135deg, #13131a, #0f0f18); border: 1px solid rgba(255,215,0,.2); border-radius: 14px; padding: 24px; margin-top: 24px; text-align: center; }
+  .final-box h2 { color: #FFD700; margin-bottom: 10px; }
+  .final-box p { color: #9090b8; font-size: .88rem; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <h1>🔑 Razorpay API Key Setup Guide</h1>
+  <p class="sub">Follow these steps while your Razorpay dashboard is open. Takes about 3 minutes.</p>
+
+  <!-- STEP 1 -->
+  <div class="step">
+    <div class="step-num">STEP 1</div>
+    <h3>🌐 Open Razorpay Dashboard</h3>
+    <p>Go to the Razorpay dashboard and make sure you are logged in:</p>
+    <a href="https://dashboard.razorpay.com" target="_blank" class="btn-link">→ Open dashboard.razorpay.com</a>
+    <div class="tip">✅ Make sure your account is <strong>KYC verified</strong> and <strong>Live mode</strong> is activated. If not, you'll only have Test keys.</div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="step">
+    <div class="step-num">STEP 2</div>
+    <h3>⚙️ Navigate to API Keys Section</h3>
+    <p>In the Razorpay dashboard, click through this path:</p>
+    <div class="nav-path">
+      <span class="nav-step">⚙️ Settings</span>
+      <span class="nav-arrow">→</span>
+      <span class="nav-step">API Keys</span>
+      <span class="nav-arrow">→</span>
+      <span class="nav-step">Select Mode: <strong>Live</strong></span>
+    </div>
+    <div class="warning">⚠️ There are TWO modes — <span class="badge-test">Test Mode</span> (for testing) and <span class="badge-live">Live Mode</span> (real payments). Always use <strong>Live Mode</strong> for production.</div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div class="step">
+    <div class="step-num">STEP 3</div>
+    <h3>🔄 Generate API Keys</h3>
+    <ol>
+      <li>Click <strong>"Generate Key"</strong> (or "Regenerate" if you've done it before)</li>
+      <li>Razorpay will show you <strong>two values</strong>:</li>
+    </ol>
+    <div class="highlight">
+      <span class="key-name">Key ID (starts with rzp_live_...)</span>
+      <span class="key-val">rzp_live_XXXXXXXXXXXXXXXX</span>
+      <br><br>
+      <span class="key-name">Key Secret (shown ONCE — copy immediately!)</span>
+      <span class="key-val">XXXXXXXXXXXXXXXXXXXXXXXX</span>
+    </div>
+    <div class="warning">⚠️ The <strong>Key Secret is shown only once</strong>. Copy it immediately and save it somewhere safe. If you miss it, you'll need to regenerate.</div>
+  </div>
+
+  <!-- STEP 4 -->
+  <div class="step">
+    <div class="step-num">STEP 4</div>
+    <h3>📋 Paste Your Keys Below (for reference)</h3>
+    <p>Type or paste your keys here so you have them ready to give to us for integration:</p>
+    <div class="input-row">
+      <div class="input-box">
+        <label>Key ID (rzp_live_...)</label>
+        <input type="text" placeholder="rzp_live_XXXXXXXXXXXXXXXX" id="keyId">
+      </div>
+      <div class="input-box">
+        <label>Key Secret</label>
+        <input type="password" placeholder="••••••••••••••••••••••••" id="keySecret">
+      </div>
+    </div>
+    <div class="tip" style="margin-top:12px;">💡 Once you have these two values, just paste them in the chat and we'll integrate them into BizNexus immediately.</div>
+  </div>
+
+  <!-- STEP 5 -->
+  <div class="step">
+    <div class="step-num">STEP 5</div>
+    <h3>📝 What We'll Do With Your Keys</h3>
+    <p>Once you provide the keys, here's exactly what gets set up in BizNexus:</p>
+    <ul style="margin-top:10px;">
+      <li>Create <code>/includes/razorpay_config.php</code> with your keys</li>
+      <li>Build <code>/membership/upgrade.php</code> — Razorpay checkout page</li>
+      <li>Create <code>/api/payment_verify.php</code> — verifies payment & upgrades plan</li>
+      <li>Update dashboard to show upgrade button with payment flow</li>
+      <li>Add webhook support for subscription renewal tracking</li>
+    </ul>
+    <div class="highlight" style="margin-top:14px;">
+      <span class="key-name">Plans we'll set up:</span>
+      <span style="color:#c0c0d8;">Silver — ₹999/month</span><br>
+      <span style="color:#c0c0d8;">Gold &nbsp; — ₹1,999/month</span><br>
+      <span style="color:#c0c0d8;">Platinum — ₹3,999/month</span>
+    </div>
+    <div class="warning">⚠️ Confirm the above plan prices before we hard-code them. You can change them anytime.</div>
+  </div>
+
+  <!-- Also need -->
+  <div class="step">
+    <div class="step-num">ALSO NEEDED</div>
+    <h3>📦 Optional — Razorpay Plan IDs</h3>
+    <p>If you want <strong>subscriptions</strong> (auto-recurring monthly) instead of one-time payments, you'll also need to create Plans in Razorpay:</p>
+    <div class="nav-path">
+      <span class="nav-step">💳 Subscriptions</span>
+      <span class="nav-arrow">→</span>
+      <span class="nav-step">Plans</span>
+      <span class="nav-arrow">→</span>
+      <span class="nav-step">Create Plan</span>
+    </div>
+    <p style="margin-top:8px;">Each plan will give you a <code>plan_XXXXXX</code> ID. Tell us if you want subscriptions or one-time payments — we'll build accordingly.</p>
+  </div>
+
+  <!-- Final -->
+  <div class="final-box">
+    <h2>💬 Ready to Share?</h2>
+    <p>Once you have your <strong>Key ID</strong> and <strong>Key Secret</strong>, just paste them in the chat.<br>We'll have the full payment gateway running within minutes!</p>
+    <p style="margin-top:10px;font-size:.8rem;color:#555577;">🔒 Keys are stored locally in your server's config file — never exposed publicly</p>
+  </div>
+
+</div>
+</body>
+</html>

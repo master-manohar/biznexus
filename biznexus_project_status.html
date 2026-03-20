@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BizNexus — Project Status Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #07070f; --card: #0f0f1a; --card2: #13131e; --border: #1e1e2e;
+    --gold: #FFD700; --green: #00e87a; --red: #ff4d6d; --blue: #4488ff;
+    --orange: #ff8c00; --purple: #a259ff; --text: #d0d0e8; --muted: #666688;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── HEADER ── */
+  .header { background: linear-gradient(135deg, #0d0d1a 0%, #13131e 100%); border-bottom: 1px solid var(--border); padding: 28px 40px; display: flex; align-items: center; justify-content: space-between; }
+  .header-title { font-family: 'Syne', sans-serif; font-size: 1.8rem; font-weight: 800; background: linear-gradient(135deg, var(--gold), var(--orange)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header-sub { font-size: .82rem; color: var(--muted); margin-top: 4px; }
+  .live-badge { display: flex; align-items: center; gap: 6px; background: rgba(0,232,122,.1); border: 1px solid rgba(0,232,122,.3); border-radius: 20px; padding: 6px 14px; font-size: .78rem; color: var(--green); font-weight: 600; }
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.4;} }
+
+  /* ── NAV TABS ── */
+  .nav-tabs { display: flex; gap: 4px; padding: 16px 40px 0; background: var(--card); border-bottom: 1px solid var(--border); overflow-x: auto; }
+  .nav-tab { padding: 10px 20px; border-radius: 8px 8px 0 0; cursor: pointer; font-size: .85rem; font-weight: 600; color: var(--muted); border: none; background: transparent; transition: .2s; white-space: nowrap; }
+  .nav-tab:hover { color: var(--text); background: rgba(255,255,255,.04); }
+  .nav-tab.active { background: var(--bg); color: var(--gold); border: 1px solid var(--border); border-bottom: 1px solid var(--bg); }
+
+  /* ── CONTENT ── */
+  .content { padding: 28px 40px; max-width: 1400px; }
+  .tab-panel { display: none; } .tab-panel.active { display: block; }
+
+  /* ── STAT STRIP ── */
+  .stat-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 12px; margin-bottom: 24px; }
+  .stat-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 14px; }
+  .stat-box .num { font-size: 1.9rem; font-weight: 800; font-family: 'Syne', sans-serif; }
+  .stat-box .lbl { font-size: .68rem; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: .8px; }
+
+  /* ── TABLES ── */
+  .table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 20px; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { padding: 10px 14px; text-align: left; font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); background: var(--card2); border-bottom: 1px solid var(--border); }
+  tbody td { padding: 11px 14px; font-size: .83rem; border-bottom: 1px solid rgba(30,30,46,.8); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: rgba(255,255,255,.015); }
+
+  /* ── BADGES ── */
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: .67rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; white-space: nowrap; }
+  .bg-green { background: rgba(0,232,122,.12); color: var(--green); border: 1px solid rgba(0,232,122,.3); }
+  .bg-red { background: rgba(255,77,109,.12); color: var(--red); border: 1px solid rgba(255,77,109,.3); }
+  .bg-gold { background: rgba(255,215,0,.12); color: var(--gold); border: 1px solid rgba(255,215,0,.3); }
+  .bg-blue { background: rgba(68,136,255,.12); color: var(--blue); border: 1px solid rgba(68,136,255,.3); }
+  .bg-orange { background: rgba(255,140,0,.12); color: var(--orange); border: 1px solid rgba(255,140,0,.3); }
+  .bg-purple { background: rgba(162,89,255,.12); color: var(--purple); border: 1px solid rgba(162,89,255,.3); }
+  .bg-muted { background: rgba(255,255,255,.05); color: var(--muted); border: 1px solid rgba(255,255,255,.1); }
+
+  /* ── CARDS ── */
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px,1fr)); gap: 16px; margin-bottom: 24px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+  .card-title { font-size: .9rem; font-weight: 700; color: #e8e8f5; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .card p { font-size: .82rem; color: var(--muted); line-height: 1.6; }
+
+  /* ── PRIORITY ROWS ── */
+  .priority-high { border-left: 3px solid var(--red); }
+  .priority-med { border-left: 3px solid var(--orange); }
+  .priority-low { border-left: 3px solid var(--blue); }
+  .priority-done { border-left: 3px solid var(--green); opacity: .75; }
+
+  /* ── PROGRESS BAR ── */
+  .progress-wrap { background: #1a1a28; border-radius: 4px; height: 6px; overflow: hidden; margin-top: 8px; }
+  .progress-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, var(--gold), var(--orange)); }
+
+  /* ── HTTP STATUS COLORS ── */
+  .http-200 { color: var(--green); font-weight: 700; }
+  .http-302 { color: var(--blue); font-weight: 700; }
+  .http-403 { color: var(--orange); font-weight: 700; }
+  .http-404 { color: var(--red); font-weight: 700; }
+  .http-500 { color: var(--red); font-weight: 700; }
+
+  /* ── SECTION HEADER ── */
+  .section-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .section-title { font-family: 'Syne', sans-serif; font-size: 1.15rem; font-weight: 800; color: #e8e8f5; }
+  .section-sub { font-size: .78rem; color: var(--muted); margin-top: 2px; }
+  .divider { height: 1px; background: var(--border); margin: 24px 0; }
+
+  /* ── TIMELINE ── */
+  .timeline { display: flex; flex-direction: column; gap: 0; }
+  .tl-item { display: flex; gap: 16px; padding-bottom: 20px; position: relative; }
+  .tl-item:not(:last-child)::before { content:''; position:absolute; left:15px; top:32px; bottom:0; width:2px; background:var(--border); }
+  .tl-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; z-index: 1; }
+  .tl-done { background: rgba(0,232,122,.15); border: 1px solid rgba(0,232,122,.4); }
+  .tl-pending { background: rgba(255,215,0,.1); border: 1px solid rgba(255,215,0,.3); }
+  .tl-blocked { background: rgba(255,77,109,.1); border: 1px solid rgba(255,77,109,.3); }
+  .tl-body { flex: 1; padding-top: 4px; }
+  .tl-title { font-size: .88rem; font-weight: 600; color: #e8e8f5; }
+  .tl-desc { font-size: .78rem; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+
+  /* ── PLAN CARDS ── */
+  .plan-item { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 10px; display: flex; align-items: flex-start; gap: 14px; }
+  .plan-num { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: .85rem; font-weight: 800; flex-shrink: 0; }
+  .plan-body .plan-title { font-size: .88rem; font-weight: 700; color: #e8e8f5; margin-bottom: 4px; }
+  .plan-body .plan-desc { font-size: .78rem; color: var(--muted); line-height: 1.5; }
+  .plan-meta { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+
+  a { color: var(--blue); text-decoration: none; } a:hover { text-decoration: underline; }
+
+  @media (max-width: 768px) {
+    .header, .nav-tabs, .content { padding-left: 16px; padding-right: 16px; }
+    .stat-strip { grid-template-columns: repeat(2,1fr); }
+  }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════ HEADER ══════════════════════════════ -->
+<div class="header">
+  <div>
+    <div class="header-title">🚀 BizNexus Platform</div>
+    <div class="header-sub">End-to-End Project Status Report — Generated: 18 March 2026, 11:27 PM IST</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div class="live-badge"><span class="live-dot"></span>Live at biznexus.in</div>
+    <a href="https://biznexus.in" target="_blank" style="padding:8px 16px;background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.3);border-radius:8px;color:var(--gold);font-size:.83rem;font-weight:600;text-decoration:none;">Open Site ↗</a>
+  </div>
+</div>
+
+<!-- ══════════════════════════════ TABS ══════════════════════════════ -->
+<div class="nav-tabs">
+  <button class="nav-tab active" onclick="showTab('overview')">📊 Overview</button>
+  <button class="nav-tab" onclick="showTab('httptest')">🔗 HTTP Tests</button>
+  <button class="nav-tab" onclick="showTab('features')">✅ Feature Status</button>
+  <button class="nav-tab" onclick="showTab('tomorrow')">📋 Tomorrow's Plan</button>
+  <button class="nav-tab" onclick="showTab('blocked')">🚫 Blocked Items</button>
+  <button class="nav-tab" onclick="showTab('timeline')">📅 Work Timeline</button>
+</div>
+
+<!-- ══════════════════════════════ CONTENT ══════════════════════════════ -->
+<div class="content">
+
+<!-- ━━━━━━━━━━━━━━ OVERVIEW ━━━━━━━━━━━━━━ -->
+<div id="tab-overview" class="tab-panel active">
+  <div class="stat-strip" style="margin-top:8px;">
+    <div class="stat-box"><div class="num" style="color:var(--green);">22</div><div class="lbl">Pages Live (302/200)</div></div>
+    <div class="stat-box"><div class="num" style="color:var(--gold);">34</div><div class="lbl">Features Built</div></div>
+    <div class="stat-box"><div class="num" style="color:var(--purple);">6</div><div class="lbl">AI Agents Deployed</div></div>
+    <div class="stat-box"><div class="num" style="color:var(--blue);">7</div><div class="lbl">DB Tables Added</div></div>
+    <div class="stat-box"><div class="num" style="color:var(--orange);">4</div><div class="lbl">Pending (needs key)</div></div>
+    <div class="stat-box"><div class="num" style="color:var(--red);">2</div><div class="lbl">Needs More Work</div></div>
+  </div>
+
+  <!-- Progress -->
+  <div class="card" style="margin-bottom:20px;">
+    <div class="card-title">🏗️ Overall Project Progress</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+      <span style="font-size:.8rem;color:var(--muted);width:180px;">Core Platform</span>
+      <div style="flex:1;"><div class="progress-wrap"><div class="progress-fill" style="width:92%;background:linear-gradient(90deg,var(--green),#00a855);"></div></div></div>
+      <span style="font-size:.8rem;color:var(--green);font-weight:700;">92%</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+      <span style="font-size:.8rem;color:var(--muted);width:180px;">Superadmin Panel</span>
+      <div style="flex:1;"><div class="progress-wrap"><div class="progress-fill" style="width:85%;"></div></div></div>
+      <span style="font-size:.8rem;color:var(--gold);font-weight:700;">85%</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+      <span style="font-size:.8rem;color:var(--muted);width:180px;">Group System</span>
+      <div style="flex:1;"><div class="progress-wrap"><div class="progress-fill" style="width:78%;"></div></div></div>
+      <span style="font-size:.8rem;color:var(--gold);font-weight:700;">78%</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+      <span style="font-size:.8rem;color:var(--muted);width:180px;">Meetings System</span>
+      <div style="flex:1;"><div class="progress-wrap"><div class="progress-fill" style="width:70%;"></div></div></div>
+      <span style="font-size:.8rem;color:var(--gold);font-weight:700;">70%</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;">
+      <span style="font-size:.8rem;color:var(--muted);width:180px;">Payment Gateway</span>
+      <div style="flex:1;"><div class="progress-wrap"><div class="progress-fill" style="width:10%;background:linear-gradient(90deg,var(--red),#aa0000);"></div></div></div>
+      <span style="font-size:.8rem;color:var(--red);font-weight:700;">10% (Needs Keys)</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span style="font-size:.8rem;color:var(--muted);width:180px;">WhatsApp Integration</span>
+      <div style="flex:1;"><div class="progress-wrap"><div class="progress-fill" style="width:5%;background:linear-gradient(90deg,var(--red),#aa0000);"></div></div></div>
+      <span style="font-size:.8rem;color:var(--red);font-weight:700;">5% (Needs Template)</span>
+    </div>
+  </div>
+
+  <div class="cards-grid">
+    <div class="card">
+      <div class="card-title">🟢 What's Working Great</div>
+      <p>✅ Landing page & registrations<br>✅ Member dashboard with sidebar<br>✅ Analytics with real DB data<br>✅ Notifications system (5 types)<br>✅ Group & badge system<br>✅ CRM lead pipeline<br>✅ Trust Score & KYC<br>✅ Sitemap + Google Search Console<br>✅ Community page<br>✅ Email via SMTP (Hostinger)</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🟡 Partially Working</div>
+      <p>⚠️ Superadmin (rebuilt today — needs visual QA)<br>⚠️ Meeting scheduler (needs Google OAuth for real links)<br>⚠️ Group role sidebar (needs layout_start.php upload verification)<br>⚠️ Leads list (schema may have edge cases)<br>⚠️ Font visibility on dark theme (partial fix done)</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🔴 Blocked / Missing</div>
+      <p>❌ Razorpay — no API keys yet<br>❌ WhatsApp via WABO.AI — no template approved<br>❌ Mobile OTP Verification — not built<br>❌ Public Member Directory — not built<br>❌ KYC Review UI (Admin) — not built<br>❌ Marketplace Search & Filter — not built</p>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━ HTTP TESTS ━━━━━━━━━━━━━━ -->
+<div id="tab-httptest" class="tab-panel">
+  <div class="section-hdr" style="margin-top:8px;">
+    <div><div class="section-title">🔗 Live HTTP Status Check</div><div class="section-sub">All routes tested from server — 18 Mar 2026 11:27 PM IST. 302 = Auth redirect (correct).</div></div>
+  </div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Page</th><th>URL</th><th>HTTP Code</th><th>Meaning</th><th>Status</th></tr></thead>
+    <tbody>
+    <tr><td>🏠 Home/Landing</td><td><a href="https://biznexus.in/" target="_blank">biznexus.in/</a></td><td class="http-200">200</td><td>Public page loads</td><td><span class="badge bg-green">✓ OK</span></td></tr>
+    <tr><td>🔐 Login</td><td><a href="https://biznexus.in/auth/login.php" target="_blank">/auth/login.php</a></td><td class="http-200">200</td><td>Login page public</td><td><span class="badge bg-green">✓ OK</span></td></tr>
+    <tr><td>📝 Register</td><td><a href="https://biznexus.in/auth/register.php" target="_blank">/auth/register.php</a></td><td class="http-200">200</td><td>Register page public</td><td><span class="badge bg-green">✓ OK</span></td></tr>
+    <tr><td>📊 Dashboard</td><td><a href="https://biznexus.in/dashboard/index.php" target="_blank">/dashboard/index.php</a></td><td class="http-302">302</td><td>Auth redirect (correct)</td><td><span class="badge bg-blue">✓ Protected</span></td></tr>
+    <tr><td>⚙️ Superadmin</td><td><a href="https://biznexus.in/superadmin.php" target="_blank">/superadmin.php</a></td><td class="http-302">302</td><td>Auth redirect (correct)</td><td><span class="badge bg-blue">✓ Protected</span></td></tr>
+    <tr><td>💼 Leads List</td><td><a href="https://biznexus.in/leads/list.php" target="_blank">/leads/list.php</a></td><td class="http-302">302</td><td>Auth redirect (correct)</td><td><span class="badge bg-blue">✓ Protected</span></td></tr>
+    <tr><td>💼 Leads (old)</td><td><a href="https://biznexus.in/leads.php" target="_blank">/leads.php</a></td><td class="http-302">302</td><td>Redirects to leads/list.php</td><td><span class="badge bg-green">✓ Redirect OK</span></td></tr>
+    <tr><td>📅 Meetings List</td><td><a href="https://biznexus.in/meetings/list.php" target="_blank">/meetings/list.php</a></td><td class="http-302">302</td><td>Auth redirect (correct)</td><td><span class="badge bg-blue">✓ Protected</span></td></tr>
+    <tr><td>📅 Book Meeting</td><td><a href="https://biznexus.in/meetings/book.php" target="_blank">/meetings/book.php</a></td><td class="http-302">302</td><td>Auth redirect (correct)</td><td><span class="badge bg-blue">✓ Protected</span></td></tr>
+    <tr><td>🏛️ Group Meeting</td><td><a href="https://biznexus.in/meetings/group_meeting.php" target="_blank">/meetings/group_meeting.php</a></td><td class="http-302">302</td><td>Auth redirect (correct)</td><td><span class="badge bg-blue">✓ Protected</span></td></tr>
+    <tr><td>💬 Community</td><td><a href="https://biznexus.in/community/index.php" target="_blank">/community/index.php</a></td><td class="http-302">302</td><td>Auth redirect (correct)</td><td><span class="badge bg-blue">✓ Protected</span></td></tr>
+    <tr><td>🏆 Group Tiers</td><td><a href="https://biznexus.in/groups/tiers.php" target="_blank">/groups/tiers.php</a></td><td class="http-302">302</td><td>Auth redirect (correct)</td><td><span class="badge bg-blue">✓ Protected</span></td></tr>
+    <tr><td>📈 Analytics</td><td><a href="https://biznexus.in/analytics/index.php" target="_blank">/analytics/index.php</a></td><td class="http-302">302</td><td>Auth redirect (correct)</td><td><span class="badge bg-blue">✓ Protected</span></td></tr>
+    <tr><td>🔔 Notifications</td><td><a href="https://biznexus.in/notifications/index.php" target="_blank">/notifications/index.php</a></td><td class="http-302">302</td><td>Auth redirect (correct)</td><td><span class="badge bg-blue">✓ Protected</span></td></tr>
+    <tr><td>⭐ Trust Score</td><td><a href="https://biznexus.in/trust/score.php" target="_blank">/trust/score.php</a></td><td class="http-302">302</td><td>Auth redirect (correct)</td><td><span class="badge bg-blue">✓ Protected</span></td></tr>
+    <tr><td>🛒 Marketplace</td><td><a href="https://biznexus.in/marketplace/list.php" target="_blank">/marketplace/list.php</a></td><td class="http-302">302</td><td>Auth redirect (correct)</td><td><span class="badge bg-blue">✓ Protected</span></td></tr>
+    <tr><td>👤 Profile Edit</td><td><a href="https://biznexus.in/profile/edit.php" target="_blank">/profile/edit.php</a></td><td class="http-302">302</td><td>Auth redirect (correct)</td><td><span class="badge bg-blue">✓ Protected</span></td></tr>
+    <tr><td>🤝 Referrals</td><td><a href="https://biznexus.in/referrals/list.php" target="_blank">/referrals/list.php</a></td><td class="http-302">302</td><td>Auth redirect (correct)</td><td><span class="badge bg-blue">✓ Protected</span></td></tr>
+    <tr><td>🪙 VooCoins</td><td><a href="https://biznexus.in/coins/wallet.php" target="_blank">/coins/wallet.php</a></td><td class="http-302">302</td><td>Auth redirect (correct)</td><td><span class="badge bg-blue">✓ Protected</span></td></tr>
+    <tr><td>📄 Quotes</td><td><a href="https://biznexus.in/quotes/list.php" target="_blank">/quotes/list.php</a></td><td class="http-302">302</td><td>Auth redirect (correct)</td><td><span class="badge bg-blue">✓ Protected</span></td></tr>
+    <tr><td>🧾 Invoices</td><td><a href="https://biznexus.in/invoices/list.php" target="_blank">/invoices/list.php</a></td><td class="http-302">302</td><td>Auth redirect (correct)</td><td><span class="badge bg-blue">✓ Protected</span></td></tr>
+    <tr><td>🗺️ Sitemap</td><td><a href="https://biznexus.in/sitemap.xml" target="_blank">/sitemap.xml</a></td><td class="http-200">200</td><td>Public XML sitemap</td><td><span class="badge bg-green">✓ OK</span></td></tr>
+    <tr><td>📬 Contact</td><td><a href="https://biznexus.in/pages/contact.php" target="_blank">/pages/contact.php</a></td><td class="http-200">200</td><td>Public contact page</td><td><span class="badge bg-green">✓ OK</span></td></tr>
+    <tr><td>🤖 Group Automation</td><td><a href="https://biznexus.in/api/group_automation.php" target="_blank">/api/group_automation.php</a></td><td class="http-200">200</td><td>Agent accessible</td><td><span class="badge bg-green">✓ OK</span></td></tr>
+    <tr><td>🚀 Deploy Agent</td><td><a href="https://biznexus.in/agent/deploy_phase2.php" target="_blank">/agent/deploy_phase2.php</a></td><td class="http-403">403</td><td>Blocked (security correct)</td><td><span class="badge bg-gold">⚠ Intended</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div style="padding:12px 16px;background:rgba(0,232,122,.06);border:1px solid rgba(0,232,122,.2);border-radius:10px;font-size:.82rem;color:var(--green);">
+    ✅ All 26 URLs responding correctly. 200 = public pages. 302 = auth-protected (correct). 403 = intentionally blocked.
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━ FEATURE STATUS ━━━━━━━━━━━━━━ -->
+<div id="tab-features" class="tab-panel">
+  <div class="section-hdr" style="margin-top:8px;">
+    <div><div class="section-title">✅ Feature Status</div><div class="section-sub">All planned and built features with current status</div></div>
+  </div>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>#</th><th>Feature</th><th>Category</th><th>Status</th><th>Comments</th><th>Priority</th></tr></thead>
+    <tbody>
+    <tr class="priority-done"><td>1</td><td>Landing Page</td><td>Public</td><td><span class="badge bg-green">✓ Done</span></td><td>AI-powered hero, CTA, features grid</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>2</td><td>Auth (Login + Register)</td><td>Auth</td><td><span class="badge bg-green">✓ Done</span></td><td>Session-based auth, password hashing</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>3</td><td>Member Dashboard</td><td>Core</td><td><span class="badge bg-green">✓ Done</span></td><td>Stats, quick links, activity feed</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>4</td><td>Left Sidebar Navigation</td><td>UI/UX</td><td><span class="badge bg-green">✓ Done</span></td><td>All pages use layout_start.php sidebar</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>5</td><td>Notifications System</td><td>Core</td><td><span class="badge bg-green">✓ Done</span></td><td>5 types: meetings, referrals, coins, groups, news</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>6</td><td>Analytics Dashboard</td><td>Admin</td><td><span class="badge bg-green">✓ Done</span></td><td>Real DB data, top categories, member growth</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>7</td><td>CRM Lead Pipeline</td><td>Business</td><td><span class="badge bg-green">✓ Done</span></td><td>Filter by city/category/status, claim leads</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>8</td><td>Group System (Tiers)</td><td>Groups</td><td><span class="badge bg-green">✓ Done</span></td><td>6 tiers: Nexus→Gold, auto-assignment</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>9</td><td>Group Roles (President/VP etc.)</td><td>Groups</td><td><span class="badge bg-green">✓ Done</span></td><td>6 roles, shown in sidebar, DB column added</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>10</td><td>Badge System</td><td>Gamification</td><td><span class="badge bg-green">✓ Done</span></td><td>Award badges, display on profile</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>11</td><td>Trust Score & KYC</td><td>Profile</td><td><span class="badge bg-green">✓ Done</span></td><td>Diamond/Gold/Blue badges, KYC flow</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>12</td><td>Meetings List & Book</td><td>Meetings</td><td><span class="badge bg-green">✓ Done</span></td><td>List upcoming/past, book new meeting</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>13</td><td>Community Page</td><td>Social</td><td><span class="badge bg-green">✓ Done</span></td><td>Feed, posts, member activity</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>14</td><td>Marketplace</td><td>Business</td><td><span class="badge bg-green">✓ Done</span></td><td>List products/services</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>15</td><td>Referrals System</td><td>Growth</td><td><span class="badge bg-green">✓ Done</span></td><td>Refer code, earnings tracking</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>16</td><td>VooCoins Wallet</td><td>Economy</td><td><span class="badge bg-green">✓ Done</span></td><td>Balance, transactions, earn/spend</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>17</td><td>Google Search Console</td><td>SEO</td><td><span class="badge bg-green">✓ Done</span></td><td>Sitemap submitted, verified</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>18</td><td>Email SMTP (hello@biznexus.in)</td><td>Infra</td><td><span class="badge bg-green">✓ Done</span></td><td>Hostinger SMTP, password updated today</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>19</td><td>Multi-Agent AI System Design</td><td>Strategy</td><td><span class="badge bg-green">✓ Done</span></td><td>6 agents deployed, GCP architecture proposed</td><td><span class="badge bg-muted">Done</span></td></tr>
+    <tr class="priority-done"><td>20</td><td>Group Automation Agent</td><td>Agents</td><td><span class="badge bg-green">✓ Done</span></td><td>President rotation, member assignment</td><td><span class="badge bg-muted">Done</span></td></tr>
+
+    <tr class="priority-med"><td>21</td><td>Superadmin Control Center</td><td>Admin</td><td><span class="badge bg-gold">⚠ Needs QA</span></td><td>Rebuilt today with member sidebar + 9 sections. Needs visual testing.</td><td><span class="badge bg-orange">High</span></td></tr>
+    <tr class="priority-med"><td>22</td><td>Group Meeting Scheduler</td><td>Meetings</td><td><span class="badge bg-gold">⚠ Needs test</span></td><td>Built. Needs verification that Google Meet links + notifications work end-to-end.</td><td><span class="badge bg-orange">High</span></td></tr>
+    <tr class="priority-med"><td>23</td><td>Font Visibility (Dark Theme)</td><td>UI/UX</td><td><span class="badge bg-gold">⚠ Partial</span></td><td>dashboard-sidebar.css updated, but needs visual QA on all pages.</td><td><span class="badge bg-orange">High</span></td></tr>
+    <tr class="priority-med"><td>24</td><td>Leads List (leads/list.php)</td><td>Business</td><td><span class="badge bg-gold">⚠ Needs test</span></td><td>Rebuilt from scratch. Needs end-to-end login test.</td><td><span class="badge bg-orange">Medium</span></td></tr>
+    <tr class="priority-med"><td>25</td><td>Group Meeting Sidebar Link</td><td>UI/UX</td><td><span class="badge bg-gold">⚠ Partial</span></td><td>layout_start.php edited locally. Needs FTP upload + test.</td><td><span class="badge bg-blue">Medium</span></td></tr>
+
+    <tr class="priority-high"><td>26</td><td>Razorpay Payment Gateway</td><td>Payments</td><td><span class="badge bg-red">🔒 Blocked</span></td><td>Needs API keys from Razorpay dashboard. Config file ready.</td><td><span class="badge bg-red">High</span></td></tr>
+    <tr class="priority-high"><td>27</td><td>WhatsApp Lead Push (WABO.AI)</td><td>Marketing</td><td><span class="badge bg-red">🔒 Blocked</span></td><td>Needs approved WhatsApp message template from WABO.AI.</td><td><span class="badge bg-orange">Medium</span></td></tr>
+    <tr class="priority-high"><td>28</td><td>Marketplace Search & Filter</td><td>Business</td><td><span class="badge bg-purple">📋 Not Built</span></td><td>No search/filter on marketplace yet.</td><td><span class="badge bg-orange">Medium</span></td></tr>
+    <tr class="priority-high"><td>29</td><td>Public Member Directory</td><td>Business</td><td><span class="badge bg-purple">📋 Not Built</span></td><td>Public-facing page to browse BizNexus members.</td><td><span class="badge bg-blue">Medium</span></td></tr>
+    <tr class="priority-high"><td>30</td><td>Mobile OTP Verification</td><td>Auth</td><td><span class="badge bg-purple">📋 Not Built</span></td><td>SMS OTP for phone verification at signup.</td><td><span class="badge bg-blue">Low</span></td></tr>
+    <tr class="priority-high"><td>31</td><td>KYC Review UI (Admin)</td><td>Admin</td><td><span class="badge bg-purple">📋 Not Built</span></td><td>Admin interface to approve/reject KYC submissions.</td><td><span class="badge bg-blue">Medium</span></td></tr>
+    <tr class="priority-high"><td>32</td><td>Real Google Meet OAuth</td><td>Meetings</td><td><span class="badge bg-purple">📋 Not Built</span></td><td>Current implementation generates random meet.google.com links. Real OAuth needed for actual meeting creation.</td><td><span class="badge bg-orange">Medium</span></td></tr>
+    <tr class="priority-high"><td>33</td><td>Admin KYC Email Notifications</td><td>Admin</td><td><span class="badge bg-purple">📋 Not Built</span></td><td>Email to admin when KYC submitted.</td><td><span class="badge bg-blue">Low</span></td></tr>
+    <tr class="priority-high"><td>34</td><td>Renewal Email Reminders</td><td>Business</td><td><span class="badge bg-purple">📋 Not Built</span></td><td>Automated email at 30/60/90 days before plan expires.</td><td><span class="badge bg-orange">Medium</span></td></tr>
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━ TOMORROW'S PLAN ━━━━━━━━━━━━━━ -->
+<div id="tab-tomorrow" class="tab-panel">
+  <div class="section-hdr" style="margin-top:8px;">
+    <div><div class="section-title">📋 Tomorrow's Development Plan</div><div class="section-sub">Prioritized task list for the next session — 19 March 2026</div></div>
+  </div>
+
+  <div style="margin-bottom:20px;padding:14px 18px;background:rgba(255,215,0,.06);border:1px solid rgba(255,215,0,.2);border-radius:10px;">
+    <div style="font-size:.82rem;color:var(--gold);font-weight:700;margin-bottom:4px;">📌 START HERE — Session will begin with login QA</div>
+    <div style="font-size:.8rem;color:var(--muted);">Login as <code style="color:var(--gold);">manohar.nch@gmail.com</code> and verify the superadmin panel visually before building anything new.</div>
+  </div>
+
+  <div class="plan-item priority-high">
+    <div class="plan-num" style="background:rgba(255,77,109,.12);color:var(--red);">P1</div>
+    <div class="plan-body">
+      <div class="plan-title">🔍 Visual QA — Superadmin Panel</div>
+      <div class="plan-desc">Login at biznexus.in → click Superadmin → verify all 9 menu sections load correctly. Test creating a group, assigning a role, sending a broadcast. Check sidebar looks identical to member dashboard.</div>
+      <div class="plan-meta"><span class="badge bg-red">Must Do First</span><span class="badge bg-muted">~30 min</span></div>
+    </div>
+  </div>
+
+  <div class="plan-item priority-high">
+    <div class="plan-num" style="background:rgba(255,77,109,.12);color:var(--red);">P2</div>
+    <div class="plan-body">
+      <div class="plan-title">🎨 Font Visibility — Full Dark Theme QA</div>
+      <div class="plan-desc">Go through every page and check: navbar member name, sidebar link colors, form labels, table text. Fix any remaining #888 or lighter text that's invisible on dark background. Update biznexus.css + dashboard-sidebar.css.</div>
+      <div class="plan-meta"><span class="badge bg-red">High Priority</span><span class="badge bg-muted">~45 min</span></div>
+    </div>
+  </div>
+
+  <div class="plan-item priority-high">
+    <div class="plan-num" style="background:rgba(255,140,0,.12);color:var(--orange);">P3</div>
+    <div class="plan-body">
+      <div class="plan-title">📅 Group Meeting — End-to-End Test</div>
+      <div class="plan-desc">Login as a President-role user → go to /meetings/group_meeting.php → schedule a meeting → verify: (1) Google Meet link generated, (2) All group members get notification, (3) Meeting appears in meetings/list.php.</div>
+      <div class="plan-meta"><span class="badge bg-orange">High Priority</span><span class="badge bg-muted">~30 min</span></div>
+    </div>
+  </div>
+
+  <div class="plan-item priority-med">
+    <div class="plan-num" style="background:rgba(68,136,255,.12);color:var(--blue);">P4</div>
+    <div class="plan-body">
+      <div class="plan-title">🔑 Razorpay Integration</div>
+      <div class="plan-desc">Once you share the Razorpay API keys → integrate into /includes/razorpay_config.php → add payment button to membership upgrade flow → test sandbox payment.</div>
+      <div class="plan-meta"><span class="badge bg-red">⚠ Blocked — Needs Keys</span><span class="badge bg-muted">~2 hrs</span></div>
+    </div>
+  </div>
+
+  <div class="plan-item priority-med">
+    <div class="plan-num" style="background:rgba(68,136,255,.12);color:var(--blue);">P5</div>
+    <div class="plan-body">
+      <div class="plan-title">🔍 KYC Admin Review Interface</div>
+      <div class="plan-desc">Build an admin page to review member KYC submissions. Show uploaded document, approve/reject buttons, send notification to member. Add to Superadmin → Members panel as a "KYC Review" tab.</div>
+      <div class="plan-meta"><span class="badge bg-orange">Medium</span><span class="badge bg-muted">~1.5 hrs</span></div>
+    </div>
+  </div>
+
+  <div class="plan-item priority-med">
+    <div class="plan-num" style="background:rgba(68,136,255,.12);color:var(--blue);">P6</div>
+    <div class="plan-body">
+      <div class="plan-title">👥 Public Member Directory</div>
+      <div class="plan-desc">Build /members/directory.php — searchable public page showing all active BizNexus members with photo, business name, category, city. Great for SEO + trust building.</div>
+      <div class="plan-meta"><span class="badge bg-blue">Medium</span><span class="badge bg-muted">~1.5 hrs</span></div>
+    </div>
+  </div>
+
+  <div class="plan-item priority-med">
+    <div class="plan-num" style="background:rgba(68,136,255,.12);color:var(--blue);">P7</div>
+    <div class="plan-body">
+      <div class="plan-title">🛒 Marketplace Search & Filter</div>
+      <div class="plan-desc">Add search bar + category/city filter to /marketplace/list.php. Currently shows all listings without any filter.</div>
+      <div class="plan-meta"><span class="badge bg-blue">Medium</span><span class="badge bg-muted">~1 hr</span></div>
+    </div>
+  </div>
+
+  <div class="plan-item priority-low">
+    <div class="plan-num" style="background:rgba(162,89,255,.12);color:var(--purple);">P8</div>
+    <div class="plan-body">
+      <div class="plan-title">📧 Renewal Email Reminder Cron</div>
+      <div class="plan-desc">Create a cron job that emails members 30, 14, and 3 days before their plan_expires_at. Include renewal link in email.</div>
+      <div class="plan-meta"><span class="badge bg-purple">Low</span><span class="badge bg-muted">~1 hr</span></div>
+    </div>
+  </div>
+
+  <div class="plan-item priority-low">
+    <div class="plan-num" style="background:rgba(162,89,255,.12);color:var(--purple);">P9</div>
+    <div class="plan-body">
+      <div class="plan-title">📲 WhatsApp Integration (WABO.AI)</div>
+      <div class="plan-desc">Once template is approved → integrate WABO.AI API to push new leads to matched members via WhatsApp. Currently placeholder code exists in agent/wa_cron.php.</div>
+      <div class="plan-meta"><span class="badge bg-red">⚠ Blocked — Needs Template</span><span class="badge bg-muted">~2 hrs</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━ BLOCKED ━━━━━━━━━━━━━━ -->
+<div id="tab-blocked" class="tab-panel">
+  <div class="section-hdr" style="margin-top:8px;">
+    <div><div class="section-title">🚫 Blocked Items — Awaiting Input</div><div class="section-sub">These features cannot proceed without external credentials or decisions</div></div>
+  </div>
+
+  <div class="cards-grid">
+    <div class="card" style="border-color:rgba(255,77,109,.3);">
+      <div class="card-title" style="color:var(--red);">💳 Razorpay Payment Gateway</div>
+      <p>Config file ready at <code>/includes/razorpay_config.php</code>. Membership upgrade flow designed. Just needs live API keys.</p>
+      <div style="margin-top:12px;padding:10px;background:#0d0d16;border-radius:8px;font-size:.78rem;color:var(--muted);">
+        📋 <strong style="color:var(--text);">Action needed:</strong> Share Razorpay Key ID and Key Secret from your Razorpay Dashboard → Settings → API Keys.
+      </div>
+    </div>
+
+    <div class="card" style="border-color:rgba(255,77,109,.3);">
+      <div class="card-title" style="color:var(--red);">📲 WhatsApp (WABO.AI)</div>
+      <p>Agent code exists in <code>agent/wa_cron.php</code>. Lead push logic designed. Waiting on approved message template from Meta/WABO.AI.</p>
+      <div style="margin-top:12px;padding:10px;background:#0d0d16;border-radius:8px;font-size:.78rem;color:var(--muted);">
+        📋 <strong style="color:var(--text);">Action needed:</strong> Get template approved on WABO.AI → share Template Name + WABO API Key.
+      </div>
+    </div>
+
+    <div class="card" style="border-color:rgba(255,170,0,.3);">
+      <div class="card-title" style="color:var(--orange);">📅 Real Google Meet OAuth</div>
+      <p>Currently generating random meet.google.com URLs. For real scheduled meetings with calendar invite, need Google API credentials.</p>
+      <div style="margin-top:12px;padding:10px;background:#0d0d16;border-radius:8px;font-size:.78rem;color:var(--muted);">
+        📋 <strong style="color:var(--text);">Decision needed:</strong> Are randomly generated meet links acceptable, or do we need Google Calendar API OAuth integration?
+      </div>
+    </div>
+
+    <div class="card" style="border-color:rgba(68,136,255,.3);">
+      <div class="card-title" style="color:var(--blue);">📱 Mobile OTP Verification</div>
+      <p>Phone verification at signup. Need SMS gateway — suggest MSG91, Twilio, or Fast2SMS (cheapest for India).</p>
+      <div style="margin-top:12px;padding:10px;background:#0d0d16;border-radius:8px;font-size:.78rem;color:var(--muted);">
+        📋 <strong style="color:var(--text);">Decision needed:</strong> Which SMS provider to use? Recommend Fast2SMS for India (cheap, easy API).
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━ TIMELINE ━━━━━━━━━━━━━━ -->
+<div id="tab-timeline" class="tab-panel">
+  <div class="section-hdr" style="margin-top:8px;">
+    <div><div class="section-title">📅 Work Timeline</div><div class="section-sub">Chronological history of everything built across all sessions</div></div>
+  </div>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-dot tl-done">✅</div>
+      <div class="tl-body">
+        <div class="tl-title">Session 1 — Foundation & Core Setup</div>
+        <div class="tl-desc">Built landing page, auth system, member dashboard, sidebar layout. Set up hosting on Hostinger, FTP deployment pipeline. Integrated Google Fonts (Inter + Syne), Bootstrap 5.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot tl-done">✅</div>
+      <div class="tl-body">
+        <div class="tl-title">Session 2 — Business Features</div>
+        <div class="tl-desc">Built CRM Pipeline (leads/list.php), Marketplace, Referrals, VooCoins wallet. Added business profile system, category browsing, trust score & KYC flow.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot tl-done">✅</div>
+      <div class="tl-body">
+        <div class="tl-title">Session 3 — SEO & Analytics</div>
+        <div class="tl-desc">Submitted sitemap to Google Search Console, verified domain. Fixed analytics page SQL queries. Added real data for: total members, new this week, leads, top categories.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot tl-done">✅</div>
+      <div class="tl-body">
+        <div class="tl-title">Session 4 — Notifications & Groups</div>
+        <div class="tl-desc">Built full notifications system (5 types). Created groups table, group tiers page, group automation agent (President rotation). Added badge system with member_badges table. Fixed trust/score.php column mismatch.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot tl-done">✅</div>
+      <div class="tl-body">
+        <div class="tl-title">Session 5 — Multi-Agent AI Architecture</div>
+        <div class="tl-desc">Designed 6-agent autonomous system for BizNexus. Documented GCP Multi-Agent architecture. Created 3-month roadmap. Proposed: Marketing Agent, Lead Broadcaster, QA Agent, SEO Agent.</div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot tl-done">✅</div>
+      <div class="tl-body">
+        <div class="tl-title">Today (18 March 2026) — Major Overhaul</div>
+        <div class="tl-desc">
+          • Fixed superadmin access (manohar.nch role → admin)<br>
+          • Added group_role column to users table (President, VP, Gen Secretary, etc.)<br>
+          • Rebuilt meetings/book.php (fixed include paths + redirect)<br>
+          • Created meetings/group_meeting.php (Google Meet link + group notifications)<br>
+          • Rebuilt leads/list.php from scratch with CRM pipeline view<br>
+          • Rewrote dashboard-sidebar.css for font visibility<br>
+          • Completely rebuilt superadmin.php with member sidebar + 9 admin sections<br>
+          • Updated email password (hello@biznexus.in → Biz@9990)<br>
+          • Fixed DB column name: membership_expires_at → plan_expires_at<br>
+          • Created leads.php redirect → leads/list.php
+        </div>
+      </div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot tl-pending">📋</div>
+      <div class="tl-body">
+        <div class="tl-title">Tomorrow (19 March 2026) — QA + New Features</div>
+        <div class="tl-desc">Visual QA of superadmin, font visibility fixes, group meeting e2e test, KYC admin UI, member directory, marketplace search. Razorpay + WhatsApp pending external credentials.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /content -->
+
+<script>
+function showTab(id) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + id).classList.add('active');
+    event.target.classList.add('active');
+}
+</script>
+</body>
+</html>

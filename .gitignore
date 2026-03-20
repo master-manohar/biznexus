@@ -1,0 +1,8 @@
+*.zip
+/vendor/
+/.env
+/tmp/
+/brain/
+node_modules/
+includes/secrets.php
+

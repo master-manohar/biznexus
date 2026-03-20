@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BizNexus Task Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', sans-serif; background: #0a0a0f; color: #e0e0f0; font-size: 13px; }
+
+/* TOP BAR */
+.topbar { background: #13131f; border-bottom: 1px solid #1e1e30; padding: 0 24px; height: 54px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+.topbar-brand { font-size: 1rem; font-weight: 700; color: #FFD700; }
+.topbar-brand span { color: #00e87a; }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.btn-save { background: rgba(255,215,0,.12); border: 1px solid rgba(255,215,0,.3); color: #FFD700; border-radius: 6px; padding: 5px 14px; font-size: .78rem; font-weight: 600; cursor: pointer; font-family: 'Inter',sans-serif; }
+.btn-save:hover { background: rgba(255,215,0,.2); }
+#saved-msg { font-size: .75rem; color: #00e87a; opacity: 0; transition: .3s; }
+.date-lbl { font-size: .75rem; color: #444466; }
+
+/* SUMMARY BAR */
+.summary { display: flex; gap: 0; border-bottom: 1px solid #1e1e30; background: #0d0d18; }
+.sum-card { flex: 1; padding: 14px 20px; border-right: 1px solid #1e1e30; }
+.sum-card:last-child { border-right: none; }
+.sum-title { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 8px; }
+.sum-numbers { display: flex; gap: 14px; }
+.sum-n { display: flex; flex-direction: column; }
+.sum-num { font-size: 1.4rem; font-weight: 700; line-height: 1; }
+.sum-lbl { font-size: .65rem; color: #444466; margin-top: 2px; }
+.progress-bar { height: 3px; background: #1e1e30; border-radius: 2px; margin-top: 8px; }
+.progress-fill { height: 100%; border-radius: 2px; transition: width .4s; }
+
+/* PAGE LAYOUT */
+.page { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+/* SECTION */
+.section { margin-bottom: 36px; }
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 2px solid; }
+.section-title { display: flex; align-items: center; gap: 10px; font-size: .95rem; font-weight: 700; }
+.owner-pill { font-size: .68rem; padding: 3px 10px; border-radius: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; }
+.section-count { font-size: .78rem; color: #444466; }
+.btn-qa-all { font-size: .72rem; padding: 4px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; border: 1px solid; font-family: 'Inter',sans-serif; transition: .15s; }
+
+/* TABLE */
+.tbl-wrap { border: 1px solid #1e1e30; border-radius: 10px; overflow: hidden; }
+table { width: 100%; border-collapse: collapse; }
+thead { background: #0d0d18; }
+th { padding: 9px 12px; text-align: left; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #444466; border-bottom: 1px solid #1e1e30; white-space: nowrap; }
+td { padding: 9px 12px; border-bottom: 1px solid #1e1e30; vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(255,255,255,.02); }
+tr.row-done td { opacity: .45; }
+
+/* COL WIDTHS */
+.col-sno   { width: 44px; }
+.col-task  { min-width: 180px; max-width: 220px; }
+.col-prompt{ min-width: 240px; max-width: 320px; }
+.col-status{ width: 150px; }
+.col-link  { width: 100px; }
+.col-qa    { width: 90px; }
+
+/* TASK TEXT */
+.task-name { font-weight: 600; font-size: .82rem; color: #e8e8f5; }
+.task-sub  { font-size: .73rem; color: #444466; margin-top: 2px; line-height: 1.4; }
+.cat-tag   { display: inline-block; font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 1px 6px; border-radius: 3px; margin-top: 3px; }
+
+/* PROMPT TEXT */
+.prompt-text { font-size: .78rem; color: #aaaacc; line-height: 1.5; }
+.btn-copy { font-size: .65rem; padding: 2px 7px; border-radius: 4px; border: 1px solid #1e1e30; background: transparent; color: #555577; cursor: pointer; margin-top: 4px; font-family: 'Inter',sans-serif; transition: .12s; }
+.btn-copy:hover { border-color: #FFD700; color: #FFD700; }
+
+/* STATUS */
+.status-sel {
+  appearance: none; border-radius: 20px; padding: 4px 26px 4px 10px; font-size: .73rem;
+  font-weight: 700; cursor: pointer; font-family: 'Inter',sans-serif; outline: none;
+  border: 1px solid; min-width: 130px; transition: .12s;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%23666688'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 8px center;
+}
+.s-pending    { background: #0a0a15; color: #555577; border-color: #1e1e30; }
+.s-inprogress { background: rgba(68,136,255,.08); color: #4488ff; border-color: rgba(68,136,255,.35); }
+.s-testing    { background: rgba(255,170,0,.07); color: #ffaa00; border-color: rgba(255,170,0,.3); }
+.s-linkscheck { background: rgba(162,89,255,.08); color: #a259ff; border-color: rgba(162,89,255,.3); }
+.s-completed  { background: rgba(0,232,122,.07); color: #00e87a; border-color: rgba(0,232,122,.3); }
+.s-blocked    { background: rgba(255,60,80,.08); color: #ff4d6d; border-color: rgba(255,60,80,.3); }
+
+/* LINK */
+.link-btn { display: inline-flex; align-items: center; gap: 4px; color: #4488ff; font-size: .75rem; font-weight: 600; text-decoration: none; border: 1px solid rgba(68,136,255,.25); border-radius: 5px; padding: 3px 8px; transition: .12s; white-space: nowrap; }
+.link-btn:hover { background: rgba(68,136,255,.1); }
+.link-na { color: #333355; border-color: #1e1e30; pointer-events: none; }
+
+/* QA BUTTON */
+.btn-qa { font-size: .72rem; padding: 4px 10px; border-radius: 5px; border: 1px solid rgba(0,232,122,.3); background: rgba(0,232,122,.06); color: #00e87a; cursor: pointer; font-family: 'Inter',sans-serif; font-weight: 600; transition: .12s; white-space: nowrap; }
+.btn-qa:hover { background: rgba(0,232,122,.14); }
+.btn-qa.checking { border-color: rgba(255,170,0,.4); background: rgba(255,170,0,.07); color: #ffaa00; animation: blink .7s infinite; }
+@keyframes blink { 0%,100%{opacity:1}50%{opacity:.5} }
+.qa-result { font-size: .65rem; margin-top: 3px; font-weight: 600; }
+.qa-ok   { color: #00e87a; }
+.qa-fail { color: #ff4d6d; }
+.qa-na   { color: #333355; }
+
+/* SNO */
+.sno { font-size: .72rem; color: #333355; font-weight: 600; }
+
+/* PRIORITY */
+.prio { font-size: .63rem; padding: 1px 5px; border-radius: 3px; font-weight: 700; text-transform: uppercase; }
+.p-high   { background: rgba(255,60,80,.12); color: #ff4d6d; }
+.p-med    { background: rgba(255,215,0,.1); color: #FFD700; }
+.p-low    { background: rgba(80,80,100,.15); color: #444466; }
+
+/* TOAST */
+#toast { position: fixed; bottom: 20px; right: 20px; background: #13131f; border: 1px solid #1e1e30; border-radius: 8px; padding: 10px 16px; font-size: .82rem; color: #e0e0f0; z-index: 999; display: none; }
+</style>
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="topbar-brand">⚡ BizNexus <span>Tracker</span></div>
+  <div class="topbar-right">
+    <span class="date-lbl" id="dt"></span>
+    <span id="saved-msg">✓ Saved</span>
+    <button class="btn-save" onclick="saveAll()">💾 Save</button>
+  </div>
+</nav>
+
+<!-- SUMMARY -->
+<div class="summary" id="summary-bar"></div>
+
+<div class="page">
+
+<!-- ═══ CLAUDE TABLE ═══════════════════════════════════════════ -->
+<div class="section" id="sec-claude">
+  <div class="section-header" style="border-color:#FFD700">
+    <div class="section-title">
+      <span style="font-size:1.3rem">🤖</span>
+      <span style="color:#FFD700">Claude AI</span>
+      <span class="owner-pill" style="background:rgba(255,215,0,.1);color:#FFD700">Backend · Marketing · QA · APIs</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="section-count" id="cnt-claude"></span>
+      <button class="btn-qa-all" style="color:#FFD700;border-color:rgba(255,215,0,.3);background:rgba(255,215,0,.06)" onclick="qaAll('claude')">🔍 QA All</button>
+    </div>
+  </div>
+  <div class="tbl-wrap">
+    <table id="tbl-claude">
+      <thead><tr>
+        <th class="col-sno">#</th>
+        <th class="col-task">Task</th>
+        <th class="col-prompt">Prompt / What to do</th>
+        <th class="col-status">Status</th>
+        <th class="col-link">Link</th>
+        <th class="col-qa">QA Check</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ GEMINI TABLE ════════════════════════════════════════════ -->
+<div class="section" id="sec-gemini">
+  <div class="section-header" style="border-color:#4488ff">
+    <div class="section-title">
+      <span style="font-size:1.3rem">💎</span>
+      <span style="color:#4488ff">Gemini AI</span>
+      <span class="owner-pill" style="background:rgba(68,136,255,.1);color:#4488ff">App Pages · UI · Features · Bug Fixes</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="section-count" id="cnt-gemini"></span>
+      <button class="btn-qa-all" style="color:#4488ff;border-color:rgba(68,136,255,.3);background:rgba(68,136,255,.06)" onclick="qaAll('gemini')">🔍 QA All</button>
+    </div>
+  </div>
+  <div class="tbl-wrap">
+    <table id="tbl-gemini">
+      <thead><tr>
+        <th class="col-sno">#</th>
+        <th class="col-task">Task</th>
+        <th class="col-prompt">Prompt / What to do</th>
+        <th class="col-status">Status</th>
+        <th class="col-link">Link</th>
+        <th class="col-qa">QA Check</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ MANOHAR TABLE ═══════════════════════════════════════════ -->
+<div class="section" id="sec-manohar">
+  <div class="section-header" style="border-color:#00e87a">
+    <div class="section-title">
+      <span style="font-size:1.3rem">👤</span>
+      <span style="color:#00e87a">Manohar</span>
+      <span class="owner-pill" style="background:rgba(0,232,122,.1);color:#00e87a">Credentials · Uploads · Config · Sign-off</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="section-count" id="cnt-manohar"></span>
+      <button class="btn-qa-all" style="color:#00e87a;border-color:rgba(0,232,122,.3);background:rgba(0,232,122,.06)" onclick="qaAll('manohar')">🔍 QA All</button>
+    </div>
+  </div>
+  <div class="tbl-wrap">
+    <table id="tbl-manohar">
+      <thead><tr>
+        <th class="col-sno">#</th>
+        <th class="col-task">Task</th>
+        <th class="col-prompt">What You Need to Do</th>
+        <th class="col-status">Status</th>
+        <th class="col-link">Link</th>
+        <th class="col-qa">Check</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+</div><!-- /page -->
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// TASK DATA
+// ═══════════════════════════════════════════════════════════════
+const D = {
+claude: [
+  { id:'c1',  cat:'BugFix',    prio:'high',   task:'Fix activity/index.php (404)',         sub:'Activity feed page not uploaded',                  prompt:'Upload biznexus_FINAL_upload.zip to /public_html/. Then test: curl -s -o /dev/null -w "%{http_code}" https://biznexus.in/activity/index.php — must return 200',                                              link:'https://biznexus.in/activity/index.php',        status:'testing' },
+  { id:'c2',  cat:'BugFix',    prio:'high',   task:'Fix api/activity.php (404)',            sub:'Activity JSON API missing',                        prompt:'Part of biznexus_FINAL_upload.zip. After upload, test: https://biznexus.in/api/activity.php — should return JSON not 404',                                                                               link:'https://biznexus.in/api/activity.php',          status:'testing' },
+  { id:'c3',  cat:'BugFix',    prio:'high',   task:'Fix auth/reset-password.php (404)',     sub:'Password reset link in emails is broken',          prompt:'Upload biznexus_FINAL_upload.zip. Test: https://biznexus.in/auth/reset-password.php?token=test — should show form, not 404',                                                                             link:'https://biznexus.in/auth/reset-password.php',   status:'testing' },
+  { id:'c4',  cat:'BugFix',    prio:'high',   task:'Fix notifications/index.php (500)',     sub:'Notifications page crashes',                       prompt:'Fixed 500 error. Created notifications table and unread count logic.',                                                              link:'https://biznexus.in/notifications/index.php',   status:'completed' },
+  { id:'c5',  cat:'BugFix',    prio:'med',    task:'Fix community/index.php (500)',         sub:'Community page server error',                      prompt:'Fixed 500 error. Built new community feed with post/like/comment features.',                                                                                           link:'https://biznexus.in/community/index.php',       status:'completed' },
+  { id:'c6',  cat:'BugFix',    prio:'med',    task:'Fix analytics/index.php (500)',         sub:'Analytics page crashes',                           prompt:'Fixed 500 error. Showing: total members, new this week, total leads, top categories.',                                                                                  link:'https://biznexus.in/analytics/index.php',       status:'completed' },
+  { id:'c7',  cat:'BugFix',    prio:'high',   task:'sitemap.xml returns 404',              sub:'SEO broken - search engines cant find sitemap',     prompt:'Run: https://agent.biznexus.in/qa_fix.php?key=BizCron2024 — this auto-generates sitemap.xml. Then verify: https://biznexus.in/sitemap.xml returns XML.',                                             link:'https://biznexus.in/sitemap.xml',               status:'testing' },
+  { id:'c8',  cat:'Marketing', prio:'high',   task:'Marketing Dashboard Live',             sub:'7-section auto-pilot marketing HQ',                prompt:'Already deployed. Verify all 7 sections work: SEO, Email, Social, Brochure, Offers, Channels, Schedule. Test "Run All Now" button.',                                                                    link:'https://biznexus.in/marketing/dashboard.php?key=BizCron2024', status:'completed' },
+  { id:'c9',  cat:'Marketing', prio:'high',   task:'Marketing Cron Agent',                 sub:'Daily auto: SEO+Email+Social',                     prompt:'Verify: https://agent.biznexus.in/marketing_cron.php?key=BizCron2024&run=all returns JSON success. Check mkt_activity_log table has entries.',                                                        link:'https://agent.biznexus.in/marketing_cron.php?key=BizCron2024&run=seo', status:'completed' },
+  { id:'c10', cat:'Feature',   prio:'high',   task:'Smart Lead Broadcasting',              sub:'Broadcast leads by category+city filter',          prompt:'Build /agent/lead_broadcast.php — when a new lead is posted, auto-notify all active members in same city+category via WhatsApp (WABO.AI) and email. Log in mkt_activity_log.',                           link:'https://biznexus.in/leads/list.php',            status:'pending' },
+  { id:'c11', cat:'Feature',   prio:'high',   task:'12-Hour Lead Pickup Timeout',          sub:'Auto-expire leads not claimed in 12hrs',           prompt:'Build cron: check public_leads where created_at < NOW()-12hr and status=active and not claimed. Mark expired, re-broadcast to next tier of members.',                                                    link:'https://biznexus.in/leads/list.php',            status:'pending' },
+  { id:'c12', cat:'Feature',   prio:'high',   task:'Fair Lead Rotation',                   sub:'Equal lead distribution to all members',           prompt:'Track lead_claims per member per week. When assigning new lead, prioritize member with fewest claims this week. Add lead_rotation_log table.',                                                           link:'https://biznexus.in/leads/list.php',            status:'pending' },
+  { id:'c13', cat:'Feature',   prio:'med',    task:'Lead Notifications on Login',          sub:'Show missed leads popup after login',               prompt:'After successful login, query public_leads assigned to user in last 24hrs that they haven\'t seen. Show popup/banner: "You have X new leads!" with link to /leads/list.php',                          link:'https://biznexus.in/dashboard/index.php',       status:'pending' },
+  { id:'c14', cat:'Feature',   prio:'med',    task:'Inactivity Alerts (7-day)',            sub:'Email members who havent logged in 7+ days',       prompt:'Build cron: SELECT users inactive 7+ days. Send email via SMTP: "We miss you! X new leads in your category this week." Log to mkt_email_log.',                                                       link:'',                                              status:'pending' },
+  { id:'c15', cat:'Feature',   prio:'med',    task:'AI Deal Summarizer',                   sub:'Post-meeting auto notes via Claude API',            prompt:'Build /meetings/summarize.php — after meeting status=completed, use Claude API (haiku model) to auto-write deal summary based on meeting notes. Show in meetings/list.php',                            link:'https://biznexus.in/meetings/book.php',         status:'pending' },
+  { id:'c16', cat:'Feature',   prio:'med',    task:'Festival Image Generator',             sub:'WhatsApp greeting image for festivals',            prompt:'Build /marketing/festival_image.php — dropdown of Indian festivals. Claude API generates WhatsApp-ready text greeting. Save as mkt_offers type=festival.',                                              link:'https://biznexus.in/marketing/dashboard.php?key=BizCron2024', status:'pending' },
+  { id:'c17', cat:'Admin',     prio:'med',    task:'Admin KYC Approval Panel',             sub:'Review and approve member KYC documents',          prompt:'Build /admin/kyc_review.php — list all KYC submissions (kyc_documents table). Approve/Reject buttons. On approve: update users.kyc_status=verified, send confirmation email.',                          link:'https://biznexus.in/kyc/upload.php',            status:'pending' },
+  { id:'c18', cat:'QA',        prio:'high',   task:'Full QA after Phase 3 Upload',         sub:'Re-run 45-URL audit after FINAL_upload.zip',       prompt:'Run full QA: check all 45 URLs, verify activity feed works, reset-password works, marketing cron runs, no 500 errors. Update this tracker.',                                                           link:'https://agent.biznexus.in/qa_fix.php?key=BizCron2024', status:'pending' },
+  { id:'c19', cat:'SEO',       prio:'high',   task:'SEO Auto-Pages (700 pages)',           sub:'/find/category/city unique indexed pages',         prompt:'Build /agent/seo_pages.php — generate static HTML pages for each category+city combination. E.g. /find/it-services/hyderabad. Create .htaccess rewrite rules. Target 700 pages.',                       link:'https://biznexus.in/find.php',                  status:'pending' },
+  { id:'c20', cat:'Feature',   prio:'high',   task:'Smart Groups + Automation Engine',    sub:'Auto-assign, president rotation every 90 days, group balancing',  prompt:'DONE. api/group_automation.php deployed. Step1: inactive→Inactive Pool. Step2: 90-day president rotation with in/out notifications. Step3: auto-balance groups at 100 members. DB migration added president_user_id, term_started_at, group_id, group_role.',  link:'https://biznexus.in/groups/tiers.php', status:'completed' },
+  { id:'c21', cat:'BugFix',    prio:'high',   task:'Fix dashboard blank (SQL column names)', sub:'meeting_date vs date mismatch causing 500',      prompt:'DONE. Fixed meeting_date/meeting_time column names in dashboard/index.php, meetings/list.php, meetings/book.php. Dashboard is fully functional now.',                    link:'https://biznexus.in/dashboard/index.php',       status:'completed' },
+  { id:'c22', cat:'BugFix',    prio:'high',   task:'Fix superadmin.php 500 error',           sub:'CEO Command Center was crashing on load',        prompt:'DONE. Fixed relative require_once paths — was using ../includes/ but file is at root. Now uses includes/db.php and includes/auth_check.php correctly.',                   link:'https://biznexus.in/superadmin.php',            status:'completed' },
+  { id:'c23', cat:'BugFix',    prio:'high',   task:'Verify dashboard sidebar menu items',    sub:'User reported missing left-side menu items',     prompt:'DONE. Server-side HTML dump (mocked session) confirmed all sidebar links render correctly. Root cause was superadmin path issue (now fixed). Sidebar working.',              link:'https://biznexus.in/dashboard/index.php',       status:'completed' },
+  { id:'c24', cat:'Strategic', prio:'low',    task:'Multi-Agent AI Dev System Proposal',     sub:'Autonomous GCP agent fleet (CEO→Dev→Tester)',    prompt:'DONE. Full architecture proposal created: CEO/Manager/Developer/Tester agents on Vertex AI Gemini Pro. Self-correcting loop: agent writes code, tester verifies via browser, CEO approves. Zero manual intervention design.',                                          link:'',                                              status:'completed' },
+],
+
+gemini: [
+  { id:'g1',  cat:'BugFix',    prio:'high',   task:'Fix auth redirect inconsistency',      sub:'Some pages → /auth_login.php, others → /auth/login.php', prompt:'Standardized ALL redirects to /auth/login.php across codebase.', link:'https://biznexus.in/auth/login.php', status:'completed' },
+  { id:'g2',  cat:'BugFix',    prio:'high',   task:'Delete auth/forgot.php',               sub:'Old file causing 301 redirect loop',                prompt:'Deleted /public_html/auth/forgot.php to prevent loops.',                     link:'https://biznexus.in/auth/forgot-password.php',  status:'completed' },
+  { id:'g3',  cat:'BugFix',    prio:'high',   task:'Fix analytics/index.php 500 error',    sub:'Server error on analytics page',                   prompt:'Fixed 500 error. Showing: total members, new this week, total leads, top categories.', link:'https://biznexus.in/analytics/index.php', status:'completed' },
+  { id:'g4',  cat:'BugFix',    prio:'high',   task:'Fix notifications/index.php 500 error', sub:'Notifications page crashes',                      prompt:'Fixed 500 error. Created notifications table and unread count logic.',                              link:'https://biznexus.in/notifications/index.php',   status:'completed' },
+  { id:'g5',  cat:'BugFix',    prio:'med',    task:'Fix community/index.php 500 error',    sub:'Community forum page crashes',                     prompt:'Fixed 500 error. Built new community feed with post/like/comment features.',             link:'https://biznexus.in/community/index.php',       status:'completed' },
+  { id:'g6',  cat:'BugFix',    prio:'med',    task:'Fix meetings/list.php 500 error',      sub:'Meetings list page crashes',                       prompt:'Fixed 500 error. Built meetings list view and fixed schema mismatch (created_by vs requester_id).', link:'https://biznexus.in/meetings/list.php', status:'completed' },
+  { id:'g7',  cat:'BugFix',    prio:'med',    task:'Fix trust/score.php 500 error',        sub:'Trust score page crashes',                         prompt:'Fixed 500 error. Corrected member_id column mismatch in lead_dispatches and meetings query.',                                          link:'https://biznexus.in/trust/score.php',           status:'completed' },
+  { id:'g8',  cat:'Feature',   prio:'high',   task:'Payment Gateway (Razorpay)',           sub:'Enable paid plan upgrades',                        prompt:'Integrate Razorpay into /membership/upgrade.php. Plans: Nexus ₹999, Diamond ₹2499, Gold ₹4999/month. On payment success: update users.plan column. Manohar will provide Razorpay API keys.',                            link:'https://biznexus.in/membership/upgrade.php',    status:'pending' },
+  { id:'g9',  cat:'Feature',   prio:'high',   task:'WhatsApp Lead Push (2-minute)',        sub:'Auto WhatsApp when lead is assigned',               prompt:'When new lead is added to public_leads: within 2 minutes, send WhatsApp via WABO.AI API to all members in same city+category. Template: voo_lead_notify. WABO endpoint: app.wabo.ai/api. Manohar will provide template name.',   link:'https://biznexus.in/leads/list.php',            status:'pending' },
+  { id:'g10', cat:'Feature',   prio:'high',   task:'Smart Groups Tier UI',                 sub:'6-tier group membership pages',                    prompt:'Built /groups/tiers.php showing 6 group tiers with benefits table. Link from /membership/upgrade.php.',   link:'https://biznexus.in/groups/tiers.php',           status:'completed' },
+  { id:'g11', cat:'Feature',   prio:'high',   task:'Marketplace Search & Filters',         sub:'Search by category/city/price',                    prompt:'Add search bar + category dropdown + city dropdown + price range filter to /marketplace/list.php. Filter results via AJAX. Keep existing dark UI design (--card:#13131a, --gold:#FFD700).',                             link:'https://biznexus.in/marketplace/list.php',      status:'pending' },
+  { id:'g12', cat:'Feature',   prio:'med',    task:'Member Directory Page',                sub:'Public page of all verified businesses',            prompt:'Build /members/index.php — public directory of all verified members. Show: business name, category, city, trust badge, join date. Search + filter by category/city. Paginate 20/page.',                                link:'',                                              status:'pending' },
+  { id:'g13', cat:'Feature',   prio:'med',    task:'OTP / Mobile Verification',            sub:'Verify mobile number at registration',             prompt:'Add mobile OTP step to /auth/register.php. After email verified, ask for mobile number. Send OTP via WABO.AI or Twilio. Verify before completing registration. Store: users.mobile_verified=1',                          link:'https://biznexus.in/auth/register.php',         status:'pending' },
+  { id:'g14', cat:'Feature',   prio:'med',    task:'Deal Pipeline Page',                   sub:'Track B2B deal stages post-meeting',                prompt:'Build /deals/pipeline.php — Kanban-style deal tracker: New Lead → Meeting Booked → Proposal → Negotiation → Closed Won/Lost. Drag-drop status update. Link from meetings/list.php after meeting = completed.',          link:'',                                              status:'pending' },
+  { id:'g15', cat:'SEO',       prio:'high',   task:'SEO Auto-Pages UI',                   sub:'700 category+city landing pages',                  prompt:'Build /find/{category}/{city} URL structure. E.g. /find/it-services/hyderabad. Page title: "IT Services in Hyderabad | BizNexus". List matching members. Add .htaccess rewrite. Submit all to sitemap.',                  link:'https://biznexus.in/find.php',                  status:'pending' },
+  { id:'g16', cat:'Admin',     prio:'med',    task:'KYC Admin Review UI',                  sub:'Admin can approve/reject KYC',                     prompt:'Build /admin/kyc.php — show all pending KYC submissions with file preview. Approve button: updates users.kyc_status=verified. Reject: asks for reason, sends email. Accessible from superadmin.php.',                    link:'https://biznexus.in/admin/superadmin.php',      status:'pending' },
+  { id:'g17', cat:'Feature',   prio:'low',    task:'Floating AI Assistant Bubble',         sub:'Chat bubble on all dashboard pages',                prompt:'Add floating chat bubble (bottom-right) to all authenticated pages. Clicking opens AI assistant panel. Use Claude API with system prompt: "You are BizNexus AI assistant helping Indian SME business owners."',          link:'https://biznexus.in/dashboard/index.php',       status:'pending' },
+  { id:'g18', cat:'Feature',   prio:'high',   task:'Referral Send Form fix',               sub:'/referrals/send.php redirects to wrong login',     prompt:'DONE. Standardized redirect to /auth/login.php and verified referral logic.',                                              link:'https://biznexus.in/referrals/send.php',        status:'completed' },
+  { id:'g19', cat:'BugFix',    prio:'high',   task:'Dashboard sidebar menu hidden',          sub:'Main menu items not visible after login',          prompt:'DONE. Verified server renders all sidebar links for logged-in users. HTML dump with mocked session confirmed correct rendering. Superadmin path fix resolved root cause.',     link:'https://biznexus.in/dashboard/index.php',       status:'completed' },
+  { id:'g20', cat:'BugFix',    prio:'high',   task:'Group DB Migration (president cols)',     sub:'Added president_user_id, term_started_at, group_id, group_role', prompt:'DONE. ALTER TABLE ran: groups.president_user_id INT, groups.term_started_at DATETIME, users.group_id INT, users.group_role VARCHAR(50). All verified on live DB.',  link:'https://biznexus.in/superadmin.php',            status:'completed' },
+],
+
+manohar: [
+  { id:'m1',  cat:'URGENT',    prio:'high',   task:'Upload biznexus_FINAL_upload.zip',     sub:'Fixes activity feed, reset-password, api/',        prompt:'Go to Hostinger File Manager → public_html → Upload ZIP → Extract. This ZIP contains: activity/index.php, auth/reset-password.php, api/activity.php, includes/activity_logger.php, agent/deploy_final.php',                link:'https://hpanel.hostinger.com',                  status:'pending' },
+  { id:'m2',  cat:'URGENT',    prio:'high',   task:'Upload + Run qa_fix.php',              sub:'Fixes sitemap.xml and leads/claim.php',            prompt:'1. Upload biznexus_qa_fixes.zip to /public_html/agent/ and extract. 2. Open browser: https://agent.biznexus.in/qa_fix.php?key=BizCron2024. 3. Should show green checkmarks. 4. Verify sitemap: https://biznexus.in/sitemap.xml', link:'https://agent.biznexus.in/qa_fix.php?key=BizCron2024', status:'pending' },
+  { id:'m3',  cat:'URGENT',    prio:'high',   task:'Delete auth/forgot.php in Hostinger',  sub:'Causing password reset to fail',                   prompt:'Hostinger File Manager → public_html → auth folder → right-click forgot.php → DELETE. (Do NOT delete forgot-password.php — only delete forgot.php)',                                                                    link:'https://hpanel.hostinger.com',                  status:'pending' },
+  { id:'m4',  cat:'Config',    prio:'high',   task:'Set Hostinger Marketing Cron',         sub:'Run marketing agent daily 9 AM IST',               prompt:'Hostinger hPanel → Advanced → Cron Jobs → Add: Minute=0, Hour=3, Day=*, Month=*, Weekday=* → Command: /usr/bin/php /home/u175452495/domains/biznexus.in/public_html/agent/marketing_cron.php',                         link:'https://hpanel.hostinger.com',                  status:'pending' },
+  { id:'m5',  cat:'Testing',   prio:'high',   task:'Test Login in Browser',                sub:'Verify login works end-to-end',                    prompt:'Open https://biznexus.in/auth/login.php in browser. Try: email=demo_1@biznexus.in, password=Demo@2024. Should redirect to /dashboard/index.php. If broken, note error and give to Claude/Gemini.',                      link:'https://biznexus.in/auth/login.php',            status:'pending' },
+  { id:'m6',  cat:'Testing',   prio:'high',   task:'Test Full Registration Flow',          sub:'New member registration to dashboard',             prompt:'Open https://biznexus.in/auth/register.php → fill form with your test email → verify you receive confirmation email → login → check dashboard loads.',                                                                link:'https://biznexus.in/auth/register.php',         status:'pending' },
+  { id:'m7',  cat:'Testing',   prio:'high',   task:'Test Lead Claim Flow',                 sub:'Member sees lead → claims it → alert sent',        prompt:'Login as member → go to /leads/list.php → click Claim on any lead → verify it shows as claimed → check WhatsApp/email notification sent. Report any failures to Claude.',                                              link:'https://biznexus.in/leads/list.php',            status:'pending' },
+  { id:'m8',  cat:'Testing',   prio:'high',   task:'End-to-End: Register → Lead → Invoice', sub:'Full new member journey test',                   prompt:'Full test: 1) Register new member 2) Complete profile 3) Claim a lead 4) Book a meeting 5) Create invoice. Each step should work without errors. Screenshot any bugs.',                                                link:'https://biznexus.in/auth/register.php',         status:'pending' },
+  { id:'m9',  cat:'SEO',       prio:'high',   task:'Google Search Console Setup',          sub:'DONE — sitemap submitted and verified',            prompt:'DONE. DNS TXT verified via Hostinger. Sitemap biznexus.in/sitemap.xml submitted and processing in Search Console.',                                                        link:'https://search.google.com/search-console',      status:'completed' },
+  { id:'m10', cat:'SEO',       prio:'high',   task:'Create Google Business Profile',       sub:'biznexus.in on Google Maps/Search',                prompt:'Go to https://business.google.com → Add business → Name: BizNexus → Category: Business Network → Website: biznexus.in → Location: Hyderabad → Verify by phone/postcard.',                                              link:'https://business.google.com',                   status:'pending' },
+  { id:'m11', cat:'Config',    prio:'med',    task:'Add Instagram API Token',              sub:'Enables auto-posting to Instagram',                prompt:'1. Go to developers.facebook.com → My Apps → Create App (Business type) 2. Add Instagram Basic Display 3. Get Access Token 4. Go to https://biznexus.in/marketing/dashboard.php?key=BizCron2024 → Channel Setup → paste Instagram token',  link:'https://developers.facebook.com',               status:'pending' },
+  { id:'m12', cat:'Config',    prio:'med',    task:'Add Facebook Page Token',              sub:'Enables auto-posting to Facebook',                 prompt:'Meta Business Suite → Settings → Page Access Token (60-day token) → Copy → Marketing HQ → Channel Setup → Facebook token field → Save',                                                                             link:'https://business.facebook.com',                 status:'pending' },
+  { id:'m13', cat:'Config',    prio:'med',    task:'Add LinkedIn Token',                   sub:'Enables auto-posting to LinkedIn',                 prompt:'Go to https://www.linkedin.com/developers/apps → New App → Fill details → OAuth 2.0 → Get Access Token with w_member_social scope → Paste in Marketing HQ Channel Setup',                                            link:'https://www.linkedin.com/developers/apps',      status:'pending' },
+  { id:'m14', cat:'Config',    prio:'med',    task:'Add Twitter/X Bearer Token',           sub:'Enables auto-posting to Twitter',                  prompt:'Go to https://developer.twitter.com/en/apps → Create App → Keys and Tokens → Bearer Token → Copy → Marketing HQ → Channel Setup → Twitter field → Save',                                                             link:'https://developer.twitter.com',                 status:'pending' },
+  { id:'m15', cat:'Config',    prio:'high',   task:'Provide Razorpay API Keys to Gemini',  sub:'Needed for payment gateway integration',           prompt:'Get keys from https://dashboard.razorpay.com → Settings → API Keys → Generate. Share Key ID + Key Secret with Gemini as: "Razorpay Key ID: rzp_live_xxx | Secret: xxx — integrate in /membership/upgrade.php"',          link:'https://dashboard.razorpay.com',                status:'pending' },
+  { id:'m16', cat:'Config',    prio:'high',   task:'Provide WhatsApp Template to Gemini',  sub:'Template name for lead push notifications',        prompt:'Login to WABO.AI → Templates → Find or create template for lead notification → Copy exact template name → Share with Gemini: "Use template name: [name] for WhatsApp lead push in /leads/list.php"',                   link:'https://app.wabo.ai',                           status:'pending' },
+  { id:'m17', cat:'Marketing', prio:'med',    task:'Google Ads Campaign Setup',            sub:'Paid ads for biznexus.in B2B keywords',             prompt:'Go to https://ads.google.com → New Campaign → Search → Goal: Website traffic → Keywords: "B2B network India", "business leads Hyderabad", "SME network" → Budget: ₹500/day to start.',                              link:'https://ads.google.com',                        status:'pending' },
+  { id:'m18', cat:'Config',    prio:'high',   task:'Set Group Automation Weekly Cron',     sub:'Run group rotation every Sunday 2AM IST',          prompt:'Hostinger hPanel → Advanced → Cron Jobs → Add weekly cron: Minute=0, Hour=20, Day=*, Month=*, Weekday=0 → Command: /usr/bin/php /home/u175452495/domains/biznexus.in/public_html/api/group_automation.php',            link:'https://hpanel.hostinger.com',                  status:'pending' },
+  { id:'m19', cat:'Config',    prio:'high',   task:'Add Google Analytics (GA4)',           sub:'Track website visitors and conversions',            prompt:'Go to analytics.google.com → New Property → Get Measurement ID (G-XXXXXXXX) → Give to Gemini to add in all PHP page headers.',                                          link:'https://analytics.google.com',                  status:'pending' },
+  { id:'m20', cat:'Testing',   prio:'high',   task:'Test Superadmin CEO Dashboard',         sub:'Verify all admin controls work after fix',          prompt:'Go to https://biznexus.in/superadmin.php → login with admin account → verify: member table loads, groups listed, badge award works, broadcast works. Report any issues.',  link:'https://biznexus.in/superadmin.php',            status:'pending' },
+]
+};
+
+// ═══════════════════════════════════════════════════════════════
+// STATUS CONFIG
+// ═══════════════════════════════════════════════════════════════
+const SC = {
+  pending:    'Pending',
+  inprogress: 'In Progress',
+  testing:    'Testing',
+  linkscheck: 'Links Check',
+  completed:  'Completed ✓',
+  blocked:    'Blocked 🚫',
+};
+
+const CAT_COLORS = {
+  BugFix:'#ff4d6d',Feature:'#a259ff',Marketing:'#FFD700',SEO:'#00d4ff',
+  Admin:'#ff8c42',QA:'#ff8c42',Config:'#00e87a',Testing:'#4488ff',
+  Upload:'#4488ff',URGENT:'#ff4d6d',
+};
+
+// Load saved statuses
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem('bnt_v2') || '{}'); } catch(e){}
+
+function getS(id, def) { return saved[id] || def; }
+
+// ═══════════════════════════════════════════════════════════════
+// BUILD TABLES
+// ═══════════════════════════════════════════════════════════════
+function buildTable(owner) {
+  const tbody = document.querySelector(`#tbl-${owner} tbody`);
+  tbody.innerHTML = '';
+  D[owner].forEach((t, i) => {
+    const st = getS(t.id, t.status);
+    const cc = CAT_COLORS[t.cat] || '#555577';
+    const opts = Object.entries(SC).map(([k,v]) =>
+      `<option value="${k}" ${k===st?'selected':''}>${v}</option>`
+    ).join('');
+    const linkBtn = t.link
+      ? `<a href="${t.link}" target="_blank" class="link-btn">🔗 Open</a>`
+      : `<span class="link-btn link-na">N/A</span>`;
+    const prioTag = t.prio==='high' ? '<span class="prio p-high">HIGH</span>' : t.prio==='med' ? '<span class="prio p-med">MED</span>' : '<span class="prio p-low">LOW</span>';
+    
+    const tr = document.createElement('tr');
+    tr.dataset.id = t.id;
+    tr.className = st === 'completed' ? 'row-done' : '';
+    tr.innerHTML = `
+      <td class="sno">${i+1}</td>
+      <td class="col-task">
+        <div class="task-name">${t.task}</div>
+        <div class="task-sub">${t.sub}</div>
+        <span class="cat-tag" style="background:${cc}18;color:${cc}">${t.cat}</span>
+        ${prioTag}
+      </td>
+      <td class="col-prompt">
+        <div class="prompt-text">${t.prompt}</div>
+        <button class="btn-copy" onclick="copyPrompt(this,'${encodeURIComponent(t.prompt)}')">📋 Copy prompt</button>
+      </td>
+      <td class="col-status">
+        <select class="status-sel s-${st}" data-id="${t.id}" onchange="onchange(this)">
+          ${opts}
+        </select>
+      </td>
+      <td class="col-link">${linkBtn}</td>
+      <td class="col-qa">
+        ${t.link ? `<button class="btn-qa" id="qa-${t.id}" onclick="qaCheck('${t.id}','${encodeURIComponent(t.link)}')">🔍 Check</button><div class="qa-result" id="qr-${t.id}"></div>` : '<span class="qa-result qa-na">—</span>'}
+      </td>`;
+    tbody.appendChild(tr);
+  });
+  updateCount(owner);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// QA CHECK
+// ═══════════════════════════════════════════════════════════════
+async function qaCheck(id, encodedUrl) {
+  const url = decodeURIComponent(encodedUrl);
+  const btn = document.getElementById('qa-' + id);
+  const res = document.getElementById('qr-' + id);
+  
+  btn.textContent = '⏳ ...';
+  btn.className = 'btn-qa checking';
+  if (res) res.textContent = '';
+  
+  try {
+    // Use a CORS proxy approach — try to fetch and catch status
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+    const r = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+    const data = await r.json();
+    const status = data.status?.http_code;
+    
+    if (status === 200) {
+      btn.textContent = '✅ OK';
+      btn.className = 'btn-qa';
+      btn.style.background = 'rgba(0,232,122,.08)';
+      btn.style.color = '#00e87a';
+      btn.style.borderColor = 'rgba(0,232,122,.35)';
+      if (res) { res.textContent = '200 OK'; res.className = 'qa-result qa-ok'; }
+      // Auto-update status to testing if still pending
+      const row = document.querySelector(`tr[data-id="${id}"]`);
+      const sel = row?.querySelector('.status-sel');
+      if (sel && sel.value === 'pending') {
+        sel.value = 'testing';
+        sel.className = 'status-sel s-testing';
+        saved[id] = 'testing';
+        autoSave();
+      }
+    } else {
+      btn.textContent = `❌ ${status||'ERR'}`;
+      btn.className = 'btn-qa';
+      btn.style.background = 'rgba(255,60,80,.08)';
+      btn.style.color = '#ff4d6d';
+      btn.style.borderColor = 'rgba(255,60,80,.3)';
+      if (res) { res.textContent = `HTTP ${status||'?'}`; res.className = 'qa-result qa-fail'; }
+    }
+  } catch(e) {
+    // Fallback: just open the link
+    btn.textContent = '🔗 Visit';
+    btn.className = 'btn-qa';
+    btn.style.color = '#4488ff';
+    btn.style.borderColor = 'rgba(68,136,255,.3)';
+    btn.style.background = 'rgba(68,136,255,.06)';
+    btn.onclick = () => window.open(decodeURIComponent(encodedUrl), '_blank');
+    if (res) { res.textContent = 'Open manually'; res.className = 'qa-result'; res.style.color='#4488ff'; }
+  }
+}
+
+async function qaAll(owner) {
+  const tasks = D[owner].filter(t => t.link);
+  for (const t of tasks) {
+    await qaCheck(t.id, encodeURIComponent(t.link));
+    await new Promise(r => setTimeout(r, 400)); // stagger requests
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STATUS CHANGE
+// ═══════════════════════════════════════════════════════════════
+function onchange(sel) {
+  const id = sel.dataset.id;
+  saved[id] = sel.value;
+  sel.className = 'status-sel s-' + sel.value;
+  const tr = sel.closest('tr');
+  tr.className = sel.value === 'completed' ? 'row-done' : '';
+  autoSave();
+  updateAllCounts();
+}
+
+function autoSave() {
+  localStorage.setItem('bnt_v2', JSON.stringify(saved));
+  const m = document.getElementById('saved-msg');
+  m.style.opacity = '1';
+  setTimeout(() => m.style.opacity = '0', 1500);
+}
+
+function saveAll() {
+  document.querySelectorAll('.status-sel').forEach(s => { saved[s.dataset.id] = s.value; });
+  localStorage.setItem('bnt_v2', JSON.stringify(saved));
+  const m = document.getElementById('saved-msg');
+  m.style.opacity = '1';
+  setTimeout(() => m.style.opacity = '0', 2000);
+  showToast('✅ All changes saved!');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// COUNTS + SUMMARY
+// ═══════════════════════════════════════════════════════════════
+function updateCount(owner) {
+  const tasks = D[owner];
+  const done = tasks.filter(t => getS(t.id,t.status)==='completed').length;
+  const pend = tasks.filter(t => getS(t.id,t.status)==='pending').length;
+  const act  = tasks.filter(t => ['inprogress','testing','linkscheck'].includes(getS(t.id,t.status))).length;
+  document.getElementById(`cnt-${owner}`).textContent =
+    `${tasks.length} tasks · ${done} done · ${act} active · ${pend} pending`;
+}
+function updateAllCounts() {
+  ['claude','gemini','manohar'].forEach(updateCount);
+  buildSummary();
+}
+
+function buildSummary() {
+  const bar = document.getElementById('summary-bar');
+  const owners = [
+    { key:'claude',  label:'🤖 Claude',  color:'#FFD700' },
+    { key:'gemini',  label:'💎 Gemini',  color:'#4488ff' },
+    { key:'manohar', label:'👤 Manohar', color:'#00e87a' },
+  ];
+  let totalDone=0, totalAll=0;
+  let html = '';
+  owners.forEach(o => {
+    const tasks = D[o.key];
+    const done  = tasks.filter(t => getS(t.id,t.status)==='completed').length;
+    const act   = tasks.filter(t => ['inprogress','testing','linkscheck'].includes(getS(t.id,t.status))).length;
+    const blk   = tasks.filter(t => getS(t.id,t.status)==='blocked').length;
+    const total = tasks.length;
+    const pct   = Math.round((done/total)*100);
+    totalDone += done; totalAll += total;
+    html += `<div class="sum-card">
+      <div class="sum-title" style="color:${o.color}">${o.label}</div>
+      <div class="sum-numbers">
+        <div class="sum-n"><span class="sum-num" style="color:${o.color}">${pct}%</span><span class="sum-lbl">Done</span></div>
+        <div class="sum-n"><span class="sum-num" style="color:#00e87a">${done}</span><span class="sum-lbl">✅ Complete</span></div>
+        <div class="sum-n"><span class="sum-num" style="color:#4488ff">${act}</span><span class="sum-lbl">🔵 Active</span></div>
+        <div class="sum-n"><span class="sum-num" style="color:#444466">${total-done-act-blk}</span><span class="sum-lbl">⬜ Pending</span></div>
+        ${blk ? `<div class="sum-n"><span class="sum-num" style="color:#ff4d6d">${blk}</span><span class="sum-lbl">🔴 Blocked</span></div>` : ''}
+      </div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${o.color}"></div></div>
+    </div>`;
+  });
+  const totalPct = Math.round((totalDone/totalAll)*100);
+  html += `<div class="sum-card" style="background:linear-gradient(135deg,#0d0d18,#111120)">
+    <div class="sum-title" style="color:#fff">📊 Overall</div>
+    <div class="sum-numbers">
+      <div class="sum-n"><span class="sum-num" style="color:#FFD700;font-size:1.8rem">${totalPct}%</span><span class="sum-lbl">Complete</span></div>
+      <div class="sum-n"><span class="sum-num" style="color:#00e87a">${totalDone}</span><span class="sum-lbl">Done</span></div>
+      <div class="sum-n"><span class="sum-num" style="color:#444466">${totalAll-totalDone}</span><span class="sum-lbl">Remaining</span></div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" style="width:${totalPct}%;background:linear-gradient(90deg,#FFD700,#00e87a)"></div></div>
+  </div>`;
+  bar.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════════════════════════
+function copyPrompt(btn, encoded) {
+  navigator.clipboard.writeText(decodeURIComponent(encoded))
+    .then(() => { btn.textContent = '✅ Copied!'; setTimeout(() => btn.textContent = '📋 Copy prompt', 2000); });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 2500);
+}
+
+// Date
+function updateDate() {
+  document.getElementById('dt').textContent =
+    new Date().toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+updateDate();
+['claude','gemini','manohar'].forEach(buildTable);
+buildSummary();
+</script>
+</body>
+</html>
