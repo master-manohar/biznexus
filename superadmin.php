@@ -97,7 +97,8 @@ $renew_30 = $pdo->query("SELECT COUNT(*) FROM users WHERE plan_expires_at BETWEE
 $renew_60 = $pdo->query("SELECT COUNT(*) FROM users WHERE plan_expires_at BETWEEN DATE_ADD(NOW(), INTERVAL 30 DAY) AND DATE_ADD(NOW(), INTERVAL 60 DAY)")->fetchColumn();
 $renew_90 = $pdo->query("SELECT COUNT(*) FROM users WHERE plan_expires_at BETWEEN DATE_ADD(NOW(), INTERVAL 60 DAY) AND DATE_ADD(NOW(), INTERVAL 90 DAY)")->fetchColumn();
 $income_data = $pdo->query("SELECT DATE_FORMAT(created_at,'%b %Y') as mo, SUM(amount) as total FROM coin_transactions WHERE type='debit' AND created_at >= DATE_SUB(NOW(), INTERVAL 3 MONTH) GROUP BY DATE_FORMAT(created_at,'%Y-%m') ORDER BY mo DESC")->fetchAll(PDO::FETCH_ASSOC);
-$all_users   = $pdo->query("SELECT id, name, email FROM users ORDER BY name ASC LIMIT 500")->fetchAll(PDO::FETCH_ASSOC);
+// Get only members who actually exist (for assignment and filtering)
+$all_users = $pdo->query("SELECT MIN(id) as id, name, MIN(email) as email FROM users WHERE status='active' AND name!='' GROUP BY name ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 $groups      = $pdo->query("SELECT g.*, u.name as president_name, COUNT(um.id) as member_count FROM groups g LEFT JOIN users u ON g.president_user_id=u.id LEFT JOIN users um ON um.group_id=g.id GROUP BY g.id ORDER BY g.id ASC")->fetchAll(PDO::FETCH_ASSOC);
 $badges      = $pdo->query("SELECT mb.*, u.name as user_name, a.name as awarded_by_name FROM member_badges mb LEFT JOIN users u ON mb.user_id=u.id LEFT JOIN users a ON mb.awarded_by=a.id ORDER BY mb.id DESC LIMIT 30")->fetchAll(PDO::FETCH_ASSOC);
 $broadcasts  = $pdo->query("SELECT n.title, n.message, n.created_at, COUNT(*) as recipients FROM notifications n WHERE n.type='news' GROUP BY n.title, n.message, DATE(n.created_at) ORDER BY n.created_at DESC LIMIT 30")->fetchAll(PDO::FETCH_ASSOC);
@@ -134,19 +135,37 @@ $status_map = [
 
 // 1. Build WHERE for public_leads
 $plWhere = ["1=1"]; $plParams = [];
-if ($lf_search) { $plWhere[] = "(CAST(name AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ? OR CAST(email AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ? OR CAST(phone AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ? OR CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ?)"; $plParams = array_merge($plParams, ["%$lf_search%","%$lf_search%","%$lf_search%","%$lf_search%"]); }
-if ($lf_status && isset($status_map[$lf_status])) { $plWhere[] = "status IN (".implode(',', array_fill(0, count($status_map[$lf_status]), '?')).")"; $plParams = array_merge($plParams, $status_map[$lf_status]); }
-if ($lf_cat)    { $plWhere[] = "CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci = ?"; $plParams[] = $lf_cat; }
-if ($lf_source === 'referral') { $plWhere[] = "0=1"; } // Hide AI leads if source=referral
+if ($lf_search) { 
+    $plWhere[] = "(CAST(name AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ? OR CAST(email AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ? OR CAST(phone AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ? OR CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ?)"; 
+    $plParams = array_merge($plParams, ["%$lf_search%","%$lf_search%","%$lf_search%","%$lf_search%"]); 
+}
+if ($lf_status && isset($status_map[$lf_status])) { 
+    $plWhere[] = "CAST(status AS CHAR) COLLATE utf8mb4_unicode_ci IN (".implode(',', array_fill(0, count($status_map[$lf_status]), '?')).")"; 
+    $plParams = array_merge($plParams, $status_map[$lf_status]); 
+}
+if ($lf_cat) { 
+    $plWhere[] = "CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci = ?"; 
+    $plParams[] = $lf_cat; 
+}
+if ($lf_source === 'referral') { $plWhere[] = "0=1"; }
 if ($lf_assignee) { $plWhere[] = "claimed_by_member_id = ?"; $plParams[] = $lf_assignee; }
 $plStr = implode(' AND ', $plWhere);
 
 // 2. Build WHERE for referrals
 $refWhere = ["1=1"]; $refParams = [];
-if ($lf_search) { $refWhere[] = "(CAST(referred_name AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ? OR CAST(email AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ? OR CAST(phone AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ? OR CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ?)"; $refParams = array_merge($refParams, ["%$lf_search%","%$lf_search%","%$lf_search%","%$lf_search%"]); }
-if ($lf_status && isset($status_map[$lf_status])) { $refWhere[] = "status IN (".implode(',', array_fill(0, count($status_map[$lf_status]), '?')).")"; $refParams = array_merge($refParams, $status_map[$lf_status]); }
-if ($lf_cat)    { $refWhere[] = "CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci = ?"; $refParams[] = $lf_cat; }
-if ($lf_source === 'ai') { $refWhere[] = "0=1"; } // Hide referrals if source=ai
+if ($lf_search) { 
+    $refWhere[] = "(CAST(referred_name AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ? OR CAST(email AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ? OR CAST(phone AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ? OR CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci LIKE ?)"; 
+    $refParams = array_merge($refParams, ["%$lf_search%","%$lf_search%","%$lf_search%","%$lf_search%"]); 
+}
+if ($lf_status && isset($status_map[$lf_status])) { 
+    $refWhere[] = "CAST(status AS CHAR) COLLATE utf8mb4_unicode_ci IN (".implode(',', array_fill(0, count($status_map[$lf_status]), '?')).")"; 
+    $refParams = array_merge($refParams, $status_map[$lf_status]); 
+}
+if ($lf_cat) { 
+    $refWhere[] = "CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci = ?"; 
+    $refParams[] = $lf_cat; 
+}
+if ($lf_source === 'ai') { $refWhere[] = "0=1"; }
 if ($lf_assignee) { $refWhere[] = "receiver_id = ?"; $refParams[] = $lf_assignee; }
 if ($lf_min_val) { $refWhere[] = "estimated_value >= ?"; $refParams[] = $lf_min_val; }
 $refStr = implode(' AND ', $refWhere);
