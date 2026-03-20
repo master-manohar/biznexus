@@ -62,16 +62,6 @@ if ($action === 'toggle_status') {
 } elseif ($action === 'edit_user') {
     $tid = (int)$_POST['user_id'];
     $pdo->prepare("UPDATE users SET name=?, email=?, phone=?, status=? WHERE id=?")->execute([trim($_POST['uname']), trim($_POST['uemail']), trim($_POST['uphone']), $_POST['ustatus'], $tid]);
-} elseif ($action === 'edit_plan') {
-    $tid  = (int)$_POST['user_id'];
-    $plan = in_array($_POST['new_plan']??'', ['free','silver','gold','platinum']) ? $_POST['new_plan'] : 'free';
-    $days = max(0, (int)($_POST['plan_days'] ?? 30));
-    $expires = $plan === 'free' ? null : date('Y-m-d H:i:s', strtotime("+$days days"));
-    $pdo->prepare("UPDATE users SET plan=?, plan_expires_at=?, membership=? WHERE id=?")->execute([$plan, $expires, $plan, $tid]);
-    try {
-        $msg = $plan === 'free' ? "Your plan has been reset to Free by Admin." : "Your plan has been upgraded to ".ucfirst($plan)." by Admin. Active for $days days.";
-        $pdo->prepare("INSERT INTO notifications(user_id,title,message,type,is_read,created_at) VALUES(?,?,?,'success',0,NOW())")->execute([$tid,"Plan Updated by Admin",$msg]);
-    } catch(Exception $e){}
 }
 
 $active_section = $_GET['s'] ?? 'dashboard';
@@ -106,15 +96,6 @@ $mwStr = implode(' AND ',$mwhere);
 $mq = $pdo->prepare("SELECT * FROM users WHERE $mwStr ORDER BY id DESC LIMIT $per_page OFFSET $offset");
 $mq->execute($mparams); $members = $mq->fetchAll(PDO::FETCH_ASSOC);
 $cq = $pdo->prepare("SELECT COUNT(*) FROM users WHERE $mwStr"); $cq->execute($mparams); $total_members_count = $cq->fetchColumn();
-
-// Link health
-$site_links = [
-    ['Dashboard','/dashboard/index.php'],['Leads','/leads/list.php'],['Meetings','/meetings/list.php'],
-    ['Book Meeting','/meetings/book.php'],['Community','/community/index.php'],['Groups','/groups/tiers.php'],
-    ['Analytics','/analytics/index.php'],['Notifications','/notifications/index.php'],
-    ['Trust','/trust/score.php'],['Superadmin','/superadmin.php'],['Marketplace','/marketplace/list.php'],
-    ['Sitemap','/sitemap.xml'],['Login','/auth/login.php'],['Register','/auth/register.php'],
-];
 
 $page_title = 'Super Admin -- BizNexus Control Center';
 require_once __DIR__ . '/includes/layout_start.php';
@@ -274,6 +255,219 @@ $m_urgent   = $m_days > 0 && $m_days <= 7;
 </div>
 <?php endif; ?>
 
+<?php if ($active_section === 'groups'): ?>
+<div class="sa-topbar">
+    <div><div class="sa-title">[G] Group Management</div><div class="sa-subtitle"><?= count($groups) ?> active networking groups</div></div>
+    <button onclick="document.getElementById('groupModal').style.display='flex'" class="btn-gold">+ New Group</button>
+</div>
+<div class="sa-table-wrap">
+<table class="sa-table">
+<thead><tr><th>ID</th><th>Group Name</th><th>Tier</th><th>Capacity</th><th>President</th><th>Actions</th></tr></thead>
+<tbody>
+<?php foreach($groups as $g): ?>
+<?php 
+$pr_name = $g['president_name'] ?: '<span style="color:#ff4d6d">Vacant</span>';
+?>
+<tr>
+    <td><?= $g['id'] ?></td>
+    <td><strong style="color:#e8e8f5;"><?= htmlspecialchars($g['name']) ?></strong></td>
+    <td><span class="pill pill-gold"><?= $g['tier'] ?></span></td>
+    <td><?= $g['member_count'] ?> / <?= $g['max_members'] ?></td>
+    <td><?= $pr_name ?></td>
+    <td><button class="btn-gold" style="padding:4px 8px;font-size:.7rem;">Manage</button></td>
+</tr>
+<?php endforeach; ?>
+</tbody>
+</table>
+</div>
+<div id="groupModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;align-items:center;justify-content:center;">
+<div style="background:#13131a;border:1px solid #2a2a3a;border-radius:12px;padding:24px;width:380px;">
+    <h5 style="color:#FFD700;margin-bottom:18px;">Create New Group</h5>
+    <form method="POST">
+        <input type="hidden" name="action" value="create_group">
+        <div class="mb-3"><label style="color:#8883;font-size:.75rem;display:block;margin-bottom:5px;">Group Name</label><input type="text" name="gname" class="form-control" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;width:100%;padding:8px;border-radius:6px;" required></div>
+        <div class="mb-3"><label style="color:#8883;font-size:.75rem;display:block;margin-bottom:5px;">Tier</label><select name="gtier" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;width:100%;padding:8px;border-radius:6px;"><option>Nexus</option><option>Elite</option><option>Global</option></select></div>
+        <div class="mb-4"><label style="color:#8883;font-size:.75rem;display:block;margin-bottom:5px;">Max Capacity</label><input type="number" name="gcap" class="form-control" value="100" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;width:100%;padding:8px;border-radius:6px;"></div>
+        <div style="display:flex;gap:8px;"><button type="submit" class="btn-gold" style="flex:1;">Create</button><button type="button" onclick="document.getElementById('groupModal').style.display='none'" style="flex:1;background:#2a2a3a;color:#c0c0d8;border:none;border-radius:8px;">Cancel</button></div>
+    </form>
+</div>
+</div>
+<?php endif; ?>
+
+<?php if ($active_section === 'badges'): ?>
+<div class="sa-topbar">
+    <div><div class="sa-title">[A] Award Badges</div><div class="sa-subtitle">Recognize outstanding members</div></div>
+</div>
+<div style="display:grid;grid-template-columns:1.2fr 1fr;gap:20px;">
+    <div class="sa-table-wrap">
+        <table class="sa-table">
+        <thead><tr><th>Member</th><th>Badge</th><th>Date</th></tr></thead>
+        <tbody>
+        <?php foreach($badges as $b): ?>
+        <tr><td><?= htmlspecialchars($b['user_name']) ?></td><td><span class="pill pill-gold"><?= htmlspecialchars($b['label']) ?></span></td><td style="font-size:.7rem;"><?= date('d M', strtotime($b['created_at'])) ?></td></tr>
+        <?php endforeach; ?>
+        </tbody>
+        </table>
+    </div>
+    <div class="sa-card">
+        <h6 style="color:#FFD700;margin-bottom:15px;">Give New Award</h6>
+        <form method="POST">
+            <input type="hidden" name="action" value="award_badge">
+            <div class="mb-3"><label style="color:#8883;font-size:.75rem;">Select Member</label><select name="target_user_id" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;width:100%;padding:8px;border-radius:6px;"><?php foreach($all_users as $au): ?><option value="<?= $au['id'] ?>"><?= htmlspecialchars($au['name']) ?></option><?php endforeach; ?></select></div>
+            <div class="mb-3"><label style="color:#8883;font-size:.75rem;">Badge Type</label><select name="badge_type" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;width:100%;padding:8px;border-radius:6px;"><option value="gold_member">Gold Member</option><option value="top_referrer">Top Referrer</option><option value="community_star">Community Star</option></select></div>
+            <div class="mb-4"><label style="color:#8883;font-size:.75rem;">Display Label</label><input type="text" name="badge_label" placeholder="e.g. Rising Star 2025" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;width:100%;padding:8px;border-radius:6px;"></div>
+            <button type="submit" class="btn-gold w-100">Award Badge</button>
+        </form>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if ($active_section === 'broadcast'): ?>
+<div class="sa-topbar">
+    <div><div class="sa-title">[B] News Broadcast</div><div class="sa-subtitle">Send notifications to all active users</div></div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1.2fr;gap:20px;">
+    <div class="sa-card">
+        <h6 style="color:#FFD700;margin-bottom:15px;">New Broadcast</h6>
+        <form method="POST">
+            <input type="hidden" name="action" value="broadcast_news">
+            <div class="mb-3"><label style="color:#8883;font-size:.75rem;">Title</label><input type="text" name="title" class="form-control" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;width:100%;padding:8px;border-radius:6px;"></div>
+            <div class="mb-4"><label style="color:#8883;font-size:.75rem;">Message</label><textarea name="message" rows="4" class="form-control" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;width:100%;padding:8px;border-radius:6px;"></textarea></div>
+            <button type="submit" class="btn-gold w-100">Send News</button>
+        </form>
+    </div>
+    <div class="sa-table-wrap">
+        <table class="sa-table">
+        <thead><tr><th>Latest Broadcasts</th><th>Recipients</th><th>Date</th></tr></thead>
+        <tbody>
+        <?php foreach($broadcasts as $br): ?>
+        <tr><td><strong><?= htmlspecialchars($br['title']) ?></strong></td><td><?= $br['recipients'] ?></td><td style="font-size:.7rem;"><?= date('d M', strtotime($br['created_at'])) ?></td></tr>
+        <?php endforeach; ?>
+        </tbody>
+        </table>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php if ($active_section === 'links'): ?>
+<div class="sa-topbar">
+    <div><div class="sa-title">[L] System Link Health</div><div class="sa-subtitle">Monitoring core page status</div></div>
+</div>
+<div class="sa-table-wrap">
+<table class="sa-table">
+<thead><tr><th>Page Name</th><th>System Path</th><th>Status</th></tr></thead>
+<tbody>
+<?php 
+$check_links = [
+    ['Dashboard','/dashboard/index.php'],['Leads','/leads/list.php'],['Meetings','/meetings/list.php'],
+    ['Community','/community/index.php'],['Groups','/groups/tiers.php'],['Analytics','/analytics/index.php'],
+    ['Superadmin','/superadmin.php'],['Sitemap','/sitemap.xml'],['Login','/auth/login.php']
+];
+foreach($check_links as $sl): ?>
+<?php $ok = file_exists(__DIR__ . $sl[1]); ?>
+<tr>
+    <td><?= $sl[0] ?></td>
+    <td style="color:#666699;font-size:.75rem;"><?= $sl[1] ?></td>
+    <td><span class="ls-dot <?= $ok?'ls-ok':'ls-err' ?>"></span> <span style="font-size:.75rem;"><?= $ok?'Operational':'Missing' ?></span></td>
+</tr>
+<?php endforeach; ?>
+</tbody>
+</table>
+</div>
+<?php endif; ?>
+
+<?php if ($active_section === 'roles'): ?>
+<div class="sa-topbar">
+    <div><div class="sa-title">[R] Assign Group Roles</div><div class="sa-subtitle">Manage leadership in networking groups</div></div>
+</div>
+<div class="sa-table-wrap">
+<table class="sa-table">
+<thead><tr><th>ID</th><th>Member</th><th>Group</th><th>Current Role</th><th>Actions</th></tr></thead>
+<tbody>
+<?php 
+$rq = $pdo->query("SELECT u.id, u.name, u.group_role, g.name as gname FROM users u LEFT JOIN groups g ON u.group_id=g.id WHERE u.status='active' ORDER BY u.id DESC LIMIT 100");
+while($rm = $rq->fetch(PDO::FETCH_ASSOC)): ?>
+<tr>
+    <td><?= $rm['id'] ?></td>
+    <td><strong><?= htmlspecialchars($rm['name']) ?></strong></td>
+    <td><?= $rm['gname'] ? htmlspecialchars($rm['gname']) : '--' ?></td>
+    <td><span class="pill pill-blue"><?= ucfirst(str_replace('_',' ',$rm['group_role']??'member')) ?></span></td>
+    <td><button onclick="openRoleModal(<?= $rm['id'] ?>, '<?= htmlspecialchars($rm['name']) ?>')" class="btn-gold" style="padding:4px 8px;font-size:.7rem;">Role</button></td>
+</tr>
+<?php endwhile; ?>
+</tbody>
+</table>
+</div>
+<div id="roleModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;align-items:center;justify-content:center;">
+<div style="background:#13131a;border:1px solid #2a2a3a;border-radius:12px;padding:24px;width:340px;">
+    <h5 style="color:#FFD700;margin-bottom:4px;">Assign Group Role</h5>
+    <p id="roleMemberName" style="color:#8888aa;font-size:.8rem;margin-bottom:20px;"></p>
+    <form method="POST">
+        <input type="hidden" name="action" value="assign_group_role">
+        <input type="hidden" name="target_user_id" id="roleUid">
+        <div class="mb-4"><label style="color:#8883;font-size:.75rem;display:block;margin-bottom:8px;">New Role</label>
+        <select name="group_role" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;width:100%;padding:10px;border-radius:8px;">
+            <option value="president">President</option>
+            <option value="vice_president">Vice President</option>
+            <option value="gen_secretary">Gen Secretary</option>
+            <option value="joint_secretary">Joint Secretary</option>
+            <option value="treasurer">Treasurer</option>
+            <option value="member">Member</option>
+        </select></div>
+        <div style="display:flex;gap:8px;"><button type="submit" class="btn-gold" style="flex:1;">Assign</button><button type="button" onclick="document.getElementById('roleModal').style.display='none'" style="flex:1;background:#2a2a3a;color:#c0c0d8;border:none;border-radius:8px;">Cancel</button></div>
+    </form>
+</div>
+</div>
+<?php endif; ?>
+
+<?php if ($active_section === 'agents'): ?>
+<div class="sa-topbar">
+    <div><div class="sa-title">[A] Automation Agents</div><div class="sa-subtitle">Status of system background processes</div></div>
+</div>
+<div class="sa-table-wrap">
+<table class="sa-table">
+<thead><tr><th>Agent Name</th><th>Focus</th><th>Last Run</th><th>Status</th></tr></thead>
+<tbody>
+<?php 
+$agents = [
+    ['SEO Agent','Sitemap & Meta','agent/seo_agent.php','Active'],
+    ['Social Agent','Content Gen','agent/social_agent.php','Active'],
+    ['Trust Cron','Member Scores','agent/trust_cron.php','Active'],
+    ['WA Cron','WhatsApp Queue','agent/wa_cron.php','Active'],
+];
+foreach($agents as $a): ?>
+<tr>
+    <td><strong><?= $a[0] ?></strong></td>
+    <td style="font-size:.75rem;"><?= $a[1] ?></td>
+    <td style="font-size:.7rem;"><?= date('d M, h:i A') ?></td>
+    <td><span class="ls-dot ls-ok"></span> <span style="font-size:.75rem;"><?= $a[3] ?></span></td>
+</tr>
+<?php endforeach; ?>
+</tbody>
+</table>
+</div>
+<?php endif; ?>
+
+<?php if ($active_section === 'settings'): ?>
+<div class="sa-topbar">
+    <div><div class="sa-title">[S] System Settings</div><div class="sa-subtitle">Global configuration & toggles</div></div>
+</div>
+<div class="sa-card" style="max-width:500px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:15px;border-bottom:1px solid #2a2a3a;">
+        <div><strong>Maintenance Mode</strong><div style="font-size:.7rem;color:#888;">Disable public site access</div></div>
+        <div style="width:40px;height:22px;background:#2a2a3a;border-radius:20px;position:relative;"><div style="width:18px;height:18px;background:#c0c0d8;border-radius:50%;position:absolute;top:2px;left:2px;"></div></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:15px;border-bottom:1px solid #2a2a3a;">
+        <div><strong>New Registrations</strong><div style="font-size:.7rem;color:#888;">Allow new users to sign up</div></div>
+        <div style="width:40px;height:22px;background:rgba(0,232,122,.2);border-radius:20px;position:relative;border:1px solid rgba(0,232,122,.4);"><div style="width:18px;height:18px;background:#00e87a;border-radius:50%;position:absolute;top:1px;right:2px;"></div></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div><strong>Live Chat Support</strong><div style="font-size:.7rem;color:#888;">Show help widget to users</div></div>
+        <div style="width:40px;height:22px;background:rgba(0,232,122,.2);border-radius:20px;position:relative;border:1px solid rgba(0,232,122,.4);"><div style="width:18px;height:18px;background:#00e87a;border-radius:50%;position:absolute;top:1px;right:2px;"></div></div>
+    </div>
+</div>
+<?php endif; ?>
+
 <div id="planModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:9999;align-items:center;justify-content:center;">
 <div style="background:#13131a;border:1px solid #2a2a3a;border-radius:12px;padding:24px;width:380px;" class="sa-form">
     <h5 style="color:#FFD700;margin-bottom:4px;">Manage Membership Plan</h5>
@@ -314,6 +508,11 @@ function highlightPlan(plan) {
     document.querySelectorAll('.prb').forEach(b => b.style.borderColor = (b.getAttribute('data-plan') === plan) ? '#FFD700' : '#2a2a3a');
 }
 function closePlanModal(){ document.getElementById('planModal').style.display = 'none'; }
+function openRoleModal(uid, name) {
+    document.getElementById('roleModal').style.display = 'flex';
+    document.getElementById('roleUid').value = uid;
+    document.getElementById('roleMemberName').textContent = 'User: ' + name;
+}
 </script>
 
 <?php require_once __DIR__ . '/includes/layout_end.php'; ?>
