@@ -114,78 +114,66 @@ $mq = $pdo->prepare("SELECT * FROM users WHERE $mwStr ORDER BY id DESC LIMIT $pe
 $mq->execute($mparams); $members = $mq->fetchAll(PDO::FETCH_ASSOC);
 $cq = $pdo->prepare("SELECT COUNT(*) FROM users WHERE $mwStr"); $cq->execute($mparams); $total_members_count = $cq->fetchColumn();
 
-try {
-    // Leads (Unified: AI + Referrals)
-    $leads_per_page = 50; 
-    $leads_page = max(1, (int)($_GET['lp'] ?? 1));
-    $lf_search = trim($_GET['lq']??''); $lf_status = trim($_GET['ls']??''); $lf_cat = trim($_GET['lc']??'');
+// Leads (Unified: AI + Referrals)
+$leads_per_page = 50; 
+$leads_page = max(1, (int)($_GET['lp'] ?? 1));
+$lf_search = trim($_GET['lq']??''); $lf_status = trim($_GET['ls']??''); $lf_cat = trim($_GET['lc']??'');
 
-    // 1. Build WHERE for public_leads
-    $plWhere = ["1=1"]; $plParams = [];
-    if ($lf_search) { $plWhere[] = "(name LIKE ? OR email LIKE ? OR phone LIKE ? OR category LIKE ?)"; $plParams = array_merge($plParams, ["%$lf_search%","%$lf_search%","%$lf_search%","%$lf_search%"]); }
-    if ($lf_status) { $plWhere[] = "status=?"; $plParams[] = $lf_status; }
-    if ($lf_cat)    { $plWhere[] = "category=?"; $plParams[] = $lf_cat; }
-    $plStr = implode(' AND ', $plWhere);
+// 1. Build WHERE for public_leads
+$plWhere = ["1=1"]; $plParams = [];
+if ($lf_search) { $plWhere[] = "(name LIKE ? OR email LIKE ? OR phone LIKE ? OR category LIKE ?)"; $plParams = array_merge($plParams, ["%$lf_search%","%$lf_search%","%$lf_search%","%$lf_search%"]); }
+if ($lf_status) { $plWhere[] = "status=?"; $plParams[] = $lf_status; }
+if ($lf_cat)    { $plWhere[] = "category=?"; $plParams[] = $lf_cat; }
+$plStr = implode(' AND ', $plWhere);
 
-    // 2. Build WHERE for referrals
-    $refWhere = ["1=1"]; $refParams = [];
-    if ($lf_search) { $refWhere[] = "(referred_name LIKE ? OR email LIKE ? OR phone LIKE ? OR category LIKE ?)"; $refParams = array_merge($refParams, ["%$lf_search%","%$lf_search%","%$lf_search%","%$lf_search%"]); }
-    if ($lf_status) { $refWhere[] = "status=?"; $refParams[] = $lf_status; }
-    if ($lf_cat)    { $refWhere[] = "category=?"; $refParams[] = $lf_cat; }
-    $refStr = implode(' AND ', $refWhere);
+// 2. Build WHERE for referrals
+$refWhere = ["1=1"]; $refParams = [];
+if ($lf_search) { $refWhere[] = "(referred_name LIKE ? OR email LIKE ? OR phone LIKE ? OR category LIKE ?)"; $refParams = array_merge($refParams, ["%$lf_search%","%$lf_search%","%$lf_search%","%$lf_search%"]); }
+if ($lf_status) { $refWhere[] = "status=?"; $refParams[] = $lf_status; }
+if ($lf_cat)    { $refWhere[] = "category=?"; $refParams[] = $lf_cat; }
+$refStr = implode(' AND ', $refWhere);
 
-    $lq_str = "
-    SELECT id, 
-           CAST('AI Engine' AS CHAR) COLLATE utf8mb4_unicode_ci as type, 
-           CAST(name AS CHAR) COLLATE utf8mb4_unicode_ci as name, 
-           CAST(phone AS CHAR) COLLATE utf8mb4_unicode_ci as phone, 
-           CAST(email AS CHAR) COLLATE utf8mb4_unicode_ci as email, 
-           CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci as category, 
-           CAST(city AS CHAR) COLLATE utf8mb4_unicode_ci as city, 
-           CAST(query AS CHAR) COLLATE utf8mb4_unicode_ci as query, 
-           claimed_by_member_id as assigned_to, 
-           CAST(status AS CHAR) COLLATE utf8mb4_unicode_ci as status, 
-           assigned_at, recirc_count, 0 as deal_value, 
-           CAST('System' AS CHAR) COLLATE utf8mb4_unicode_ci as given_by, 
-           CAST('AI Engine' AS CHAR) COLLATE utf8mb4_unicode_ci as given_by_group, 
-           created_at
-     FROM public_leads WHERE $plStr
-    UNION ALL
-    SELECT r.id, 
-           CAST('Referral' AS CHAR) COLLATE utf8mb4_unicode_ci as type, 
-           CAST(r.referred_name AS CHAR) COLLATE utf8mb4_unicode_ci as name, 
-           CAST(r.phone AS CHAR) COLLATE utf8mb4_unicode_ci as phone, 
-           CAST(r.email AS CHAR) COLLATE utf8mb4_unicode_ci as email, 
-           CAST(r.category AS CHAR) COLLATE utf8mb4_unicode_ci as category, 
-           '' COLLATE utf8mb4_unicode_ci as city, 
-           CAST(r.notes AS CHAR) COLLATE utf8mb4_unicode_ci as query, 
-           r.receiver_id as assigned_to, 
-           CAST(r.status AS CHAR) COLLATE utf8mb4_unicode_ci as status, 
-           r.assigned_at, r.recirc_count, r.estimated_value as deal_value, 
-           CAST(u.name AS CHAR) COLLATE utf8mb4_unicode_ci as given_by, 
-           CAST(g.name AS CHAR) COLLATE utf8mb4_unicode_ci as given_by_group, 
-           r.created_at
-     FROM referrals r LEFT JOIN users u ON r.sender_id = u.id LEFT JOIN groups g ON u.group_id = g.id
-     WHERE $refStr
-    ORDER BY created_at DESC LIMIT 100";
+$lq_str = "
+SELECT id, 
+       CAST('AI Engine' AS CHAR) COLLATE utf8mb4_unicode_ci as type, 
+       CAST(name AS CHAR) COLLATE utf8mb4_unicode_ci as name, 
+       CAST(phone AS CHAR) COLLATE utf8mb4_unicode_ci as phone, 
+       CAST(email AS CHAR) COLLATE utf8mb4_unicode_ci as email, 
+       CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci as category, 
+       CAST(city AS CHAR) COLLATE utf8mb4_unicode_ci as city, 
+       CAST(query AS CHAR) COLLATE utf8mb4_unicode_ci as query, 
+       claimed_by_member_id as assigned_to, 
+       CAST(status AS CHAR) COLLATE utf8mb4_unicode_ci as status, 
+       assigned_at, recirc_count, 0 as deal_value, 
+       CAST('System' AS CHAR) COLLATE utf8mb4_unicode_ci as given_by, 
+       CAST('AI Engine' AS CHAR) COLLATE utf8mb4_unicode_ci as given_by_group, 
+       created_at
+ FROM public_leads WHERE $plStr
+UNION ALL
+SELECT r.id, 
+       CAST('Referral' AS CHAR) COLLATE utf8mb4_unicode_ci as type, 
+       CAST(r.referred_name AS CHAR) COLLATE utf8mb4_unicode_ci as name, 
+       CAST(r.phone AS CHAR) COLLATE utf8mb4_unicode_ci as phone, 
+       CAST(r.email AS CHAR) COLLATE utf8mb4_unicode_ci as email, 
+       CAST(r.category AS CHAR) COLLATE utf8mb4_unicode_ci as category, 
+       '' COLLATE utf8mb4_unicode_ci as city, 
+       CAST(r.notes AS CHAR) COLLATE utf8mb4_unicode_ci as query, 
+       r.receiver_id as assigned_to, 
+       CAST(r.status AS CHAR) COLLATE utf8mb4_unicode_ci as status, 
+       r.assigned_at, r.recirc_count, r.estimated_value as deal_value, 
+       CAST(u.name AS CHAR) COLLATE utf8mb4_unicode_ci as given_by, 
+       CAST(g.name AS CHAR) COLLATE utf8mb4_unicode_ci as given_by_group, 
+       r.created_at
+ FROM referrals r LEFT JOIN users u ON r.sender_id = u.id LEFT JOIN groups g ON u.group_id = g.id
+ WHERE $refStr
+ORDER BY created_at DESC LIMIT 100";
 
-    $lq = $pdo->prepare($lq_str);
-    $lq->execute(array_merge($plParams, $refParams));
-    $all_leads = $lq->fetchAll(PDO::FETCH_ASSOC);
-    $total_leads_count = count($all_leads);
+$lq = $pdo->prepare($lq_str);
+$lq->execute(array_merge($plParams, $refParams));
+$all_leads = $lq->fetchAll(PDO::FETCH_ASSOC);
+$total_leads_count = count($all_leads);
 
-    $lead_categories = $pdo->query("SELECT DISTINCT category FROM (SELECT CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci as category FROM public_leads UNION SELECT CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci FROM referrals) as t WHERE category!=''")->fetchAll(PDO::FETCH_COLUMN);
-
-} catch (Exception $e) {
-    echo "<div style='background:#1a1a28;color:#ff4d6d;padding:20px;border-radius:12px;margin:20px;font-family:monospace;'>";
-    echo "<h3>SQL/System Error:</h3>";
-    echo "Message: " . htmlspecialchars($e->getMessage()) . "<br>";
-    echo "File: " . $e->getFile() . " (Line: " . $e->getLine() . ")";
-    echo "</div>";
-    $all_leads = [];
-    $total_leads_count = 0;
-    $lead_categories = [];
-}
+$lead_categories = $pdo->query("SELECT DISTINCT category FROM (SELECT CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci as category FROM public_leads UNION SELECT CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci FROM referrals) as t WHERE category!=''")->fetchAll(PDO::FETCH_COLUMN);
 
 $page_title = 'Super Admin -- BizNexus Control Center';
 require_once __DIR__ . '/includes/layout_start.php';
