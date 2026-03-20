@@ -135,10 +135,36 @@ try {
     $refStr = implode(' AND ', $refWhere);
 
     $lq_str = "
-    SELECT id, 'AI Engine' as type, name, phone, email, category, city, query, claimed_by_member_id as assigned_to, status, assigned_at, recirc_count, 0 as deal_value, 'System' as given_by, 'AI Engine' as given_by_group, created_at
+    SELECT id, 
+           CAST('AI Engine' AS CHAR) COLLATE utf8mb4_unicode_ci as type, 
+           CAST(name AS CHAR) COLLATE utf8mb4_unicode_ci as name, 
+           CAST(phone AS CHAR) COLLATE utf8mb4_unicode_ci as phone, 
+           CAST(email AS CHAR) COLLATE utf8mb4_unicode_ci as email, 
+           CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci as category, 
+           CAST(city AS CHAR) COLLATE utf8mb4_unicode_ci as city, 
+           CAST(query AS CHAR) COLLATE utf8mb4_unicode_ci as query, 
+           claimed_by_member_id as assigned_to, 
+           CAST(status AS CHAR) COLLATE utf8mb4_unicode_ci as status, 
+           assigned_at, recirc_count, 0 as deal_value, 
+           CAST('System' AS CHAR) COLLATE utf8mb4_unicode_ci as given_by, 
+           CAST('AI Engine' AS CHAR) COLLATE utf8mb4_unicode_ci as given_by_group, 
+           created_at
      FROM public_leads WHERE $plStr
     UNION ALL
-    SELECT r.id, 'Referral' as type, r.referred_name as name, r.phone, r.email, r.category, '' as city, r.notes as query, r.receiver_id as assigned_to, r.status, r.assigned_at, r.recirc_count, r.estimated_value as deal_value, u.name as given_by, g.name as given_by_group, r.created_at
+    SELECT r.id, 
+           CAST('Referral' AS CHAR) COLLATE utf8mb4_unicode_ci as type, 
+           CAST(r.referred_name AS CHAR) COLLATE utf8mb4_unicode_ci as name, 
+           CAST(r.phone AS CHAR) COLLATE utf8mb4_unicode_ci as phone, 
+           CAST(r.email AS CHAR) COLLATE utf8mb4_unicode_ci as email, 
+           CAST(r.category AS CHAR) COLLATE utf8mb4_unicode_ci as category, 
+           '' COLLATE utf8mb4_unicode_ci as city, 
+           CAST(r.notes AS CHAR) COLLATE utf8mb4_unicode_ci as query, 
+           r.receiver_id as assigned_to, 
+           CAST(r.status AS CHAR) COLLATE utf8mb4_unicode_ci as status, 
+           r.assigned_at, r.recirc_count, r.estimated_value as deal_value, 
+           CAST(u.name AS CHAR) COLLATE utf8mb4_unicode_ci as given_by, 
+           CAST(g.name AS CHAR) COLLATE utf8mb4_unicode_ci as given_by_group, 
+           r.created_at
      FROM referrals r LEFT JOIN users u ON r.sender_id = u.id LEFT JOIN groups g ON u.group_id = g.id
      WHERE $refStr
     ORDER BY created_at DESC LIMIT 100";
@@ -148,7 +174,7 @@ try {
     $all_leads = $lq->fetchAll(PDO::FETCH_ASSOC);
     $total_leads_count = count($all_leads);
 
-    $lead_categories = $pdo->query("SELECT DISTINCT category FROM (SELECT category FROM public_leads UNION SELECT category FROM referrals) as t WHERE category!=''")->fetchAll(PDO::FETCH_COLUMN);
+    $lead_categories = $pdo->query("SELECT DISTINCT category FROM (SELECT CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci as category FROM public_leads UNION SELECT CAST(category AS CHAR) COLLATE utf8mb4_unicode_ci FROM referrals) as t WHERE category!=''")->fetchAll(PDO::FETCH_COLUMN);
 
 } catch (Exception $e) {
     echo "<div style='background:#1a1a28;color:#ff4d6d;padding:20px;border-radius:12px;margin:20px;font-family:monospace;'>";
