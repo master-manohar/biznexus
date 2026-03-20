@@ -116,22 +116,32 @@ $cq = $pdo->prepare("SELECT COUNT(*) FROM users WHERE $mwStr"); $cq->execute($mp
 
 // Leads (Unified: AI + Referrals)
 $lf_search = trim($_GET['lq']??''); $lf_status = trim($_GET['ls']??''); $lf_cat = trim($_GET['lc']??'');
-$lwhere = ["1=1"]; $lparams = [];
-if ($lf_search) { $lwhere[] = "(name LIKE ? OR email LIKE ? OR phone LIKE ? OR category LIKE ?)"; $lparams = array_merge($lparams, ["%$lf_search%","%$lf_search%","%$lf_search%","%$lf_search%"]); }
-if ($lf_status) { $lwhere[] = "status=?"; $lparams[] = $lf_status; }
-if ($lf_cat)    { $lwhere[] = "category=?"; $lparams[] = $lf_cat; }
-$lwStr = implode(' AND ',$lwhere);
+
+// 1. Build WHERE for public_leads
+$plWhere = ["1=1"]; $plParams = [];
+if ($lf_search) { $plWhere[] = "(name LIKE ? OR email LIKE ? OR phone LIKE ? OR category LIKE ?)"; $plParams = array_merge($plParams, ["%$lf_search%","%$lf_search%","%$lf_search%","%$lf_search%"]); }
+if ($lf_status) { $plWhere[] = "status=?"; $plParams[] = $lf_status; }
+if ($lf_cat)    { $plWhere[] = "category=?"; $plParams[] = $lf_cat; }
+$plStr = implode(' AND ', $plWhere);
+
+// 2. Build WHERE for referrals
+$refWhere = ["1=1"]; $refParams = [];
+if ($lf_search) { $refWhere[] = "(referred_name LIKE ? OR email LIKE ? OR phone LIKE ? OR category LIKE ?)"; $refParams = array_merge($refParams, ["%$lf_search%","%$lf_search%","%$lf_search%","%$lf_search%"]); }
+if ($lf_status) { $refWhere[] = "status=?"; $refParams[] = $lf_status; }
+if ($lf_cat)    { $refWhere[] = "category=?"; $refParams[] = $lf_cat; }
+$refStr = implode(' AND ', $refWhere);
 
 $lq_str = "
 (SELECT id, 'AI Engine' as type, name, phone, email, category, city, query, claimed_by_member_id as assigned_to, status, assigned_at, recirc_count, 0 as deal_value, 'System' as given_by, 'AI Engine' as given_by_group, created_at
- FROM public_leads WHERE $lwStr)
+ FROM public_leads WHERE $plStr)
 UNION ALL
 (SELECT r.id, 'Referral' as type, r.referred_name as name, r.phone, r.email, r.category, '' as city, r.notes as query, r.receiver_id as assigned_to, r.status, r.assigned_at, r.recirc_count, r.estimated_value as deal_value, u.name as given_by, g.name as given_by_group, r.created_at
  FROM referrals r LEFT JOIN users u ON r.sender_id = u.id LEFT JOIN groups g ON u.group_id = g.id
- WHERE $lwStr)
+ WHERE $refStr)
 ORDER BY created_at DESC LIMIT 100";
+
 $lq = $pdo->prepare($lq_str);
-$lq->execute(array_merge($lparams, $lparams));
+$lq->execute(array_merge($plParams, $refParams));
 $all_leads = $lq->fetchAll(PDO::FETCH_ASSOC);
 
 $lead_categories = $pdo->query("SELECT DISTINCT category FROM (SELECT category FROM public_leads UNION SELECT category FROM referrals) as t WHERE category!=''")->fetchAll(PDO::FETCH_COLUMN);
