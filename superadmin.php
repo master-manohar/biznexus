@@ -536,6 +536,7 @@ while($rm = $rq->fetch(PDO::FETCH_ASSOC)): ?>
 </tbody>
 </table>
 </div>
+<?php endif; ?>
 
 <!-- Leads Pagination -->
 <?php if($total_leads_count > $leads_per_page): ?>
