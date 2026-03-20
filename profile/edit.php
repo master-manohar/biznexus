@@ -174,16 +174,25 @@ $urgent = $days_left > 0 && $days_left <= 7;
         </div>
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
-        <?php if ($plan !== 'free'): ?>
-        <div style="text-align:right;">
-            <div style="font-size:.68rem;color:#666699;text-transform:uppercase;letter-spacing:.8px;">Coin Balance</div>
-            <div style="font-size:1rem;font-weight:700;color:#FFD700;"><?= number_format($user['coins'] ?? 0) ?> 🪙</div>
+        <div style="display:flex;gap:12px;align-items:center;">
+            <div style="text-align:right;">
+                <div style="font-size:.68rem;color:#666699;text-transform:uppercase;letter-spacing:.8px;">Trust Score</div>
+                <div style="font-size:1rem;font-weight:700;color:#00e87a;"><?= calculateTrustScore($pdo, $uid) ?> <span style="font-size:.8rem;"><?= getTrustLevel(calculateTrustScore($pdo, $uid))['badge'] ?></span></div>
+            </div>
+            <?php if ($plan !== 'free'): ?>
+            <div style="text-align:right;border-left:1px solid #2a2a3a;padding-left:12px;">
+                <div style="font-size:.68rem;color:#666699;text-transform:uppercase;letter-spacing:.8px;">Coins</div>
+                <div style="font-size:1rem;font-weight:700;color:#FFD700;"><?= number_format($user['coins'] ?? 0) ?> 🪙</div>
+            </div>
+            <?php endif; ?>
         </div>
-        <?php endif; ?>
-        <a href="/membership/upgrade.php?plan=<?= $plan === 'free' ? 'silver' : $plan ?>&billing=yearly"
-           style="padding:8px 18px;background:<?= $plan==='free'?'linear-gradient(135deg,#FFD700,#ff8c00)':'rgba(255,215,0,.1)' ?>;color:<?= $plan==='free'?'#000':'#FFD700' ?>;border:1px solid rgba(255,215,0,.3);border-radius:8px;text-decoration:none;font-size:.78rem;font-weight:700;white-space:nowrap;">
-            <?= $plan === 'free' ? '⬆ Upgrade Now' : ($urgent ? '🔄 Renew Plan' : '⬆ Upgrade Plan') ?>
-        </a>
+        <div style="display:flex;gap:8px;">
+            <a href="/profile/view.php?id=<?= $uid ?>" target="_blank" style="padding:8px 15px;background:rgba(255,255,255,.05);color:#fff;border:1px solid #2a2a3a;border-radius:8px;text-decoration:none;font-size:.78rem;font-weight:600;">👁 View Profile</a>
+            <a href="/membership/upgrade.php?plan=<?= $plan === 'free' ? 'silver' : $plan ?>&billing=yearly"
+               style="padding:8px 18px;background:<?= $plan==='free'?'linear-gradient(135deg,#FFD700,#ff8c00)':'rgba(255,215,0,.1)' ?>;color:<?= $plan==='free'?'#000':'#FFD700' ?>;border:1px solid rgba(255,215,0,.3);border-radius:8px;text-decoration:none;font-size:.78rem;font-weight:700;white-space:nowrap;">
+                <?= $plan === 'free' ? '⬆ Upgrade Now' : ($urgent ? '🔄 Renew Plan' : '⬆ Upgrade Plan') ?>
+            </a>
+        </div>
     </div>
 </div>
 

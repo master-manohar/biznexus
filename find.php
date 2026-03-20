@@ -1,4 +1,5 @@
 <?php
+header('Content-Type: text/html; charset=utf-8');
 // /find.php
 // Public Lead Engine
 session_start();

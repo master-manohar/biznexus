@@ -1,4 +1,5 @@
 <?php
+header('Content-Type: text/html; charset=utf-8');
 session_start();
 require_once __DIR__ . '/includes/auth_check.php';
 require_once __DIR__ . '/includes/db.php';
@@ -108,7 +109,6 @@ $mq = $pdo->prepare("SELECT * FROM users WHERE $mwStr ORDER BY id DESC LIMIT $pe
 $mq->execute($mparams); $members = $mq->fetchAll(PDO::FETCH_ASSOC);
 $cq = $pdo->prepare("SELECT COUNT(*) FROM users WHERE $mwStr"); $cq->execute($mparams); $total_members_count = $cq->fetchColumn();
 
-/*
 // Leads (paginated + filtered)
 $leads_per_page = 50; $leads_page = max(1,(int)($_GET['lp']??1)); $l_offset = ($leads_page-1)*$leads_per_page;
 $lf_search = trim($_GET['lq']??''); $lf_status = trim($_GET['ls']??''); $lf_cat = trim($_GET['lc']??'');
@@ -121,7 +121,6 @@ $lq = $pdo->prepare("SELECT l.*, u.name as claimed_by_name FROM public_leads l L
 $lq->execute($lparams); $all_leads = $lq->fetchAll(PDO::FETCH_ASSOC);
 $lcq = $pdo->prepare("SELECT COUNT(*) FROM public_leads l WHERE $lwStr"); $lcq->execute($lparams); $total_leads_count = $lcq->fetchColumn();
 $lead_categories = $pdo->query("SELECT DISTINCT category FROM public_leads WHERE category!=''")->fetchAll(PDO::FETCH_COLUMN);
-*/
 
 $page_title = 'Super Admin -- BizNexus Control Center';
 require_once __DIR__ . '/includes/layout_start.php';

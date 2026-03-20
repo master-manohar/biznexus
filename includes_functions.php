@@ -127,4 +127,65 @@ function generateInvoiceNumber($pdo) {
         return 'BNX-' . date('YmdHis') . '-' . rand(1000, 9999);
     }
 }
+
+/**
+ * Calculate a dynamic Trust Score for a member (0 - 250)
+ */
+function calculateTrustScore($pdo, $uid) {
+    try {
+        $score = 0;
+        
+        // 1. Fetch data
+        $uStmt = $pdo->prepare("SELECT plan, created_at FROM users WHERE id = ?");
+        $uStmt->execute([$uid]);
+        $user = $uStmt->fetch();
+        if (!$user) return 0;
+
+        $pStmt = $pdo->prepare("SELECT description, category, city, gst_number FROM business_profiles WHERE user_id = ?");
+        $pStmt->execute([$uid]);
+        $profile = $pStmt->fetch();
+
+        $refStmt = $pdo->prepare("SELECT COUNT(*) FROM referrals WHERE sender_id = ?");
+        $refStmt->execute([$uid]);
+        $refsSent = (int)$refStmt->fetchColumn();
+
+        $claimsStmt = $pdo->prepare("SELECT COUNT(*) FROM public_leads WHERE claimed_by_member_id = ?");
+        $claimsStmt->execute([$uid]);
+        $leadsClaimed = (int)$claimsStmt->fetchColumn();
+
+        // 2. Profile Completion (Max 30)
+        if (!empty($profile['description'])) $score += 10;
+        if (!empty($profile['category']))    $score += 10;
+        if (!empty($profile['city']))        $score += 10;
+
+        // 3. Verification (Max 20)
+        if (!empty($profile['gst_number']))  $score += 20;
+
+        // 4. Activity (Max 50)
+        $score += min(30, $refsSent * 5);    // 5 per referral, max 30
+        $score += min(20, $leadsClaimed * 2); // 2 per lead claim, max 20
+
+        // 5. Membership Bonus
+        $tierBonus = ['platinum'=>100, 'gold'=>50, 'silver'=>20, 'free'=>0];
+        $score += $tierBonus[$user['plan']] ?? 0;
+
+        // 6. Account Age (Max 20)
+        $days = (time() - strtotime($user['created_at'])) / 86400;
+        $score += min(20, (int)(floor($days / 30) * 2)); // 2 pts per month, max 20
+
+        return min(250, $score);
+    } catch (Exception $e) {
+        return 0;
+    }
+}
+
+/**
+ * Return a trust level badge and label based on score.
+ */
+function getTrustLevel($score) {
+    if ($score >= 200) return ['label' => 'Elite Partner', 'badge' => '🏆', 'color' => '#FFD700'];
+    if ($score >= 120) return ['label' => 'Verified Expert', 'badge' => '🛡️', 'color' => '#00e87a'];
+    if ($score >= 60)  return ['label' => 'Trusted Member', 'badge' => '✅', 'color' => '#4488ff'];
+    return ['label' => 'Probationary', 'badge' => '🌱', 'color' => '#8888aa'];
+}
 ?>
