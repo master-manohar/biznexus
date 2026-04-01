@@ -2,7 +2,7 @@ import os
 import subprocess
 
 FTP_URL = "ftp://46.28.45.161"
-FTP_USER = "u175452495.biznexus.in:Skn@123nch"
+FTP_USER = "u175452495.biznexus.in:REPLACE_WITH_FTP_PASSWORD"
 
 # Folders to upload (recursive)
 FOLDERS = [

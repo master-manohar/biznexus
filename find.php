@@ -4,7 +4,8 @@ header('Content-Type: text/html; charset=utf-8');
 // Public Lead Engine
 session_start();
 require_once 'includes/db.php';
-require_once 'includes/functions.php';
+require_once 'includes/visitor_logger.php'; // Log every view for intelligence
+require_once 'includes_functions.php';
 
 // Try to include email config if it exists (for sending lead notifications)
 if (file_exists('includes/email_config.php')) {
@@ -16,51 +17,38 @@ if (!$pdo) {
     die("Database connection failed.");
 }
 
-$searchQuery = $_GET['q'] ?? '';
-$searchCity = $_GET['city'] ?? '';
-$aiUnderstood = "";
-$matchedCategory = "";
-$matchedCity = "";
+$matchedMembers = [];
 
-// 1. AI Integration Logic (Claude API)
+// 1. AI Integration Logic (Gemini API)
 if (!empty($searchQuery)) {
-    $secrets = require_once __DIR__ . '/includes/secrets.php';
-    $claudeApiKey = $secrets['anthropic_api_key'];
+    require_once __DIR__ . '/includes/ai_helper_v3.php';
+
     
-    // Improved Fallback Categories
-    $categories = ['Real Estate', 'Construction', 'Food and Beverage', 'Healthcare', 'Education', 'Retail', 'IT Services', 'Finance', 'Legal', 'Event Management', 'Photography', 'Fashion', 'Manufacturing', 'Other'];
+    // Dynamic Categories from DB for AI precision
+    $catQuery = $pdo->query("SELECT name FROM categories ORDER BY name ASC");
+    $dbCategories = $catQuery->fetchAll(PDO::FETCH_COLUMN);
+    $categories = !empty($dbCategories) ? array_merge($dbCategories, ['Other']) : ['Real Estate', 'Healthcare', 'IT Services', 'Manufacturing', 'Other'];
     $mCat = 'Other';
     
-    // Attempt real AI extraction via Claude API
+    // Attempt real AI extraction via Gemini API
     $prompt = "You are a business classifier for BizNexus. Extract the primary business category and intent from this search query: \"$searchQuery\". 
     Return ONLY a JSON object with keys: 'category' (must be one of: " . implode(', ', $categories) . ") and 'intent' (buy/sell/other).";
 
-    $ch = curl_init('https://api.anthropic.com/v1/messages');
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        'x-api-key: ' . $claudeApiKey,
-        'anthropic-version: 2023-06-01',
-        'content-type: application/json'
-    ]);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode([
-        'model' => 'claude-3-haiku-20240307',
-        'max_tokens' => 100,
-        'messages' => [['role' => 'user', 'content' => $prompt]]
-    ]));
+    $result = runBizAI([['role' => 'user', 'content' => $prompt]]);
 
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($httpCode === 200) {
-        $result = json_decode($response, true);
-        $aiText = $result['content'][0]['text'] ?? '';
+    if (isset($result['text'])) {
+        $aiText = $result['text'];
+        // Strip potential markdown backticks from AI JSON response
+        $aiText = preg_replace('/^```json\s*|\s*```$/i', '', $aiText);
         $aiData = json_decode($aiText, true);
         if ($aiData) {
             $mCat = $aiData['category'] ?? 'Other';
             $aiUnderstood = "AI matched this to " . htmlspecialchars($mCat);
         }
+    } else {
+        $err = $result['error'] ?? 'Unknown Error';
+        $v = defined('BIZNEXUS_AI_VERSION') ? BIZNEXUS_AI_VERSION : 'LEGACY';
+        $aiUnderstood = "AI Service Unavailable ($err). Version: $v";
     }
 
     // Fallback if API fails or returns Other
@@ -99,124 +87,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_lead'])) {
     $leadCity = $_POST['matched_city'] ?? '';
     $leadQuery = $_POST['original_query'] ?? '';
 
+    // Geocoding for Lead
+    $city_coords = ['Hyderabad'=>[17.3850,78.4867],'Mumbai'=>[19.0760,72.8777],'Delhi'=>[28.6139,77.2090],'Bangalore'=>[12.9716,77.5946],'Pune'=>[18.5204,73.8567],'Chennai'=>[13.0827,80.2707],'Kolkata'=>[22.5726,88.3639],'Ahmedabad'=>[23.0225,72.5714]];
+    $lat = null; $lng = null;
+    foreach($city_coords as $cn=>$cc) { if(stripos($leadCity, $cn)!==false) { $lat=$cc[0]; $lng=$cc[1]; break; } }
+
     if (empty($name) || empty($phone)) {
         $errorMessage = "Name and Phone are required to connect you with businesses.";
     } else {
-        try {
-            $pdo->beginTransaction();
-
-            // Insert into public_leads
-            $stmt = $pdo->prepare("INSERT INTO public_leads (name, phone, email, query, intent, category, city, status, total_members_notified, created_at) VALUES (?, ?, ?, ?, 'buy', ?, ?, 'new', 0, NOW())");
-            $stmt->execute([$name, $phone, $email, $leadQuery, $leadCat, $leadCity]);
-            $leadId = $pdo->lastInsertId();
-
-            // Find matching members - Strictly Category-Based as per request
-            $matchSql = "
-                SELECT u.id, u.name, u.email as user_email, u.plan, bp.business_name, bp.whatsapp, bp.category, bp.city,
-                       (SELECT MAX(notified_at) FROM lead_dispatches WHERE member_id = u.id) as last_lead_time
-                FROM users u 
-                JOIN business_profiles bp ON u.id = bp.user_id 
-                WHERE u.status = 'active' AND bp.category = ?
-            ";
-            
-            $stmtMatching = $pdo->prepare($matchSql);
-            $stmtMatching->execute([$leadCat]);
-            $allMatches = $stmtMatching->fetchAll(PDO::FETCH_ASSOC);
-
-            // --- Slot Allocation Logic ---
-            $matchedMembers = [];
-            if (!empty($allMatches)) {
-                $tierValue = ['platinum' => 4, 'gold' => 3, 'silver' => 2, 'free' => 1];
-                
-                // Primary Sort: Tier DESC, then Last Lead ASC
-                usort($allMatches, function($a, $b) use ($tierValue) {
-                    $tvA = $tierValue[$a['plan']] ?? 1;
-                    $tvB = $tierValue[$b['plan']] ?? 1;
-                    if ($tvA !== $tvB) return $tvB <=> $tvA;
-                    $timeA = $a['last_lead_time'] ?? '1970-01-01';
-                    $timeB = $b['last_lead_time'] ?? '1970-01-01';
-                    return $timeA <=> $timeB;
-                });
-                
-                // Slots 1 and 2: Top purely by Tier/Algorithm
-                if (isset($allMatches[0])) $matchedMembers[] = $allMatches[0];
-                if (isset($allMatches[1])) $matchedMembers[] = $allMatches[1];
-                
-                $remaining = array_slice($allMatches, 2);
-                
-                if (!empty($remaining)) {
-                    // Slot 3: Fair Rotation (Longest waiting member, regardless of tier)
-                    usort($remaining, function($a, $b) {
-                         $timeA = $a['last_lead_time'] ?? '1970-01-01';
-                         $timeB = $b['last_lead_time'] ?? '1970-01-01';
-                         return $timeA <=> $timeB;
-                    });
-                    
-                    $matchedMembers[] = $remaining[0];
-                    
-                    // Slots 4-10
-                    $rest = array_slice($remaining, 1);
-                    usort($rest, function($a, $b) use ($tierValue) {
-                        $tvA = $tierValue[$a['plan']] ?? 1;
-                        $tvB = $tierValue[$b['plan']] ?? 1;
-                        if ($tvA !== $tvB) return $tvB <=> $tvA;
-                        return ($a['last_lead_time'] ?? '1970-01-01') <=> ($b['last_lead_time'] ?? '1970-01-01');
-                    });
-                    
-                    for ($i = 0; $i < 7; $i++) {
-                        if (isset($rest[$i])) $matchedMembers[] = $rest[$i];
-                    }
-                }
-            }
-
-            $totalNotified = count($matchedMembers);
-
-            // Insert into lead_dispatches and Notify members
-            $rank = 1;
-            foreach ($matchedMembers as $member) {
-                // Insert tracking row
-                $dispatchStmt = $pdo->prepare("INSERT INTO lead_dispatches (lead_id, member_id, member_name, business_name, category, city, whatsapp, dispatch_rank, slot_number, status, notified_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW())");
-                $dispatchStmt->execute([
-                    $leadId, 
-                    $member['id'], 
-                    $member['name'], 
-                    $member['business_name'], 
-                    $member['category'], 
-                    $member['city'], 
-                    $member['whatsapp'] ?? '', 
-                    $rank,
-                    $rank
-                ]);
-
-                // Send Email Notification if email config is ready
-                if (file_exists(__DIR__ . '/includes/emails/lead_notify.php')) {
-                    require_once __DIR__ . '/includes/emails/lead_notify.php';
-                    sendLeadEmail(
-                        $member['user_email'], 
-                        $member['name'], 
-                        $leadCat, 
-                        $leadCity, 
-                        $leadQuery, 
-                        $name, 
-                        $phone
-                    );
-                }
-
-                // App Notification
-                sendNotification($pdo, $member['id'], "⚡ Hot Lead Received", "New matching user searching for $leadCat. Query: $leadQuery", "lead");
-
-                $rank++;
-            }
-
-            // Update public_leads with total_notified count
-            $updateLead = $pdo->prepare("UPDATE public_leads SET total_members_notified = ? WHERE id = ?");
-            $updateLead->execute([$totalNotified, $leadId]);
-
-            $pdo->commit();
+        require_once __DIR__ . '/includes/lead_dispatch_engine.php';
+        $result = dispatchPublicLead($pdo, $name, $phone, $email, $leadQuery, $leadCat, $leadCity);
+        if ($result['success']) {
             $leadSubmitted = true;
-        } catch (Exception $e) {
-            $pdo->rollBack();
-            $errorMessage = "Error processing your request: " . $e->getMessage();
+            $matchedMembers = $result['matched_members'];
+        } else {
+            $errorMessage = "Error processing your request: " . $result['error'];
         }
     }
 }
@@ -441,18 +326,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_lead'])) {
                 </form>
             </div>
 
-            <!-- Categories properly linked per Fix #4 -->
             <div class="mt-4">
-                <p style="color: var(--text3);">Popular Categories:</p>
-                <a href="?q=Real Estate" class="category-pill">Real Estate</a>
-                <a href="?q=Construction" class="category-pill">Construction</a>
-                <a href="?q=Food and Beverage" class="category-pill">Food and Beverage</a>
-                <a href="?q=Healthcare" class="category-pill">Healthcare</a>
-                <a href="?q=Retail" class="category-pill">Retail</a>
-                <a href="?q=IT Services" class="category-pill">IT Services</a>
-                <a href="?q=Legal" class="category-pill">Legal</a>
-                <a href="?q=Event Management" class="category-pill">Event Management</a>
-                <a href="?q=Manufacturing" class="category-pill">Manufacturing</a>
+                <p class="text-muted mb-3" style="font-size: 0.9rem;">Popular Categories:</p>
+                <div class="d-flex flex-wrap justify-content-center">
+                    <?php 
+                    $popularCats = $pdo->query("SELECT name FROM categories ORDER BY id ASC LIMIT 16")->fetchAll(PDO::FETCH_COLUMN);
+                    if (empty($popularCats)) $popularCats = ['Real Estate', 'Healthcare', 'IT Services', 'Manufacturing'];
+                    foreach($popularCats as $pc): 
+                    ?>
+                        <a href="find.php?q=<?= urlencode($pc) ?>" class="category-pill"><?= htmlspecialchars($pc) ?></a>
+                    <?php endforeach; ?>
+                </div>
             </div>
         <?php endif; ?>
         
@@ -478,6 +362,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_lead'])) {
         </div>
     </div>
 </div>
+
+<!-- AI Matchmaker Chat Widget -->
+<script>
+window.BizBotConfig = {
+    endpoint: '/api/public_bot_chat.php',
+    context: 'find',
+    autoOpen: true,
+    autoOpenDelay: 1500
+};
+</script>
+<script src="/assets/js/nexus_bot.js"></script>
+
+<?php require_once 'includes/turbo_lead_bar.php'; ?>
 
 </body>
 </html>

@@ -10,8 +10,8 @@ $type = trim($_GET['type'] ?? '');
 $search = trim($_GET['q'] ?? '');
 
 $sql = 'SELECT m.*, u.name as seller_name, u.business_name as seller_biz, u.city as seller_city 
-        FROM marketplace m JOIN users u ON m.user_id = u.id WHERE m.status = "active"';
-$params = [];
+        FROM marketplace m JOIN users u ON m.user_id = u.id WHERE m.user_id = ? AND m.status = "active"';
+$params = [$uid];
 if ($cat) { $sql .= ' AND m.category = ?'; $params[] = $cat; }
 if ($type) { $sql .= ' AND m.type = ?'; $params[] = $type; }
 if ($search) { $sql .= ' AND (m.title LIKE ? OR m.description LIKE ?)'; $params[] = "%{$search}%"; $params[] = "%{$search}%"; }

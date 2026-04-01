@@ -1,9 +1,9 @@
 <?php
 // deploy.php - Pushes all new changes to the live Hostinger server via FTP
 
-$ftp_server = "ftp.biznexus.in";
-$ftp_username = "u224213454_biznx";
-$ftp_userpass = "G00dday@biznexus";
+$ftp_server = "46.28.45.161";
+$ftp_username = "u175452495.biznexus.in";
+$ftp_userpass = "REPLACE_WITH_FTP_PASSWORD";
 
 // Establish FTP Connection
 $ftp_conn = ftp_connect($ftp_server) or die("Could not connect to $ftp_server");

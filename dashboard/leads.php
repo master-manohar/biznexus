@@ -66,33 +66,50 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $msg = "<div class='alert text-danger' style='border:1px solid #ff4455;'>Failed to send quote.</div>";
         }
     } elseif (isset($_POST['claim_lead'])) {
-        // Handle Lead Locking 3-Claim Max
-        $claimedCount = (int)($lead['claimed_count'] ?? 0);
-        if ($claimedCount >= 3) {
-            $msg = "<div class='alert text-danger' style='border:1px solid #ff4455;'>Sorry, this lead has already been claimed by 3 members and is now locked permanently.</div>";
+        // Enforce membership limits based on plan
+        $plan = $user['plan'] ?? 'free';
+        $limits = ['free' => 3, 'silver' => 40, 'gold' => 80, 'platinum' => 9999];
+        $limit = $limits[$plan] ?? 3;
+
+        // Count claims this month
+        $stmtCount = $pdo->prepare("SELECT COUNT(*) FROM lead_dispatches WHERE member_id = ? AND status IN ('claimed', 'contacted') AND notified_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)");
+        $stmtCount->execute([$uid]);
+        $currentMonthClaims = (int)$stmtCount->fetchColumn();
+
+        if ($currentMonthClaims >= $limit) {
+            $msg = "<div class='alert text-warning' style='border:1px solid #FFD700; background:rgba(255,215,0,0.05);'>
+                        <strong>Monthly Limit Reached:</strong> You have used your $plan plan's limit of $limit lead claims. 
+                        <a href='/membership/upgrade.php' class='btn btn-gold btn-sm ms-3'>Upgrade to Unlock More</a>
+                    </div>";
         } else {
-            // Check if already claimed
-            $checkStmt = $pdo->prepare("SELECT status FROM lead_dispatches WHERE lead_id = ? AND member_id = ?");
-            $checkStmt->execute([$lead_id, $uid]);
-            $ldStatus = $checkStmt->fetchColumn();
-            
-            if ($ldStatus === 'claimed' || $ldStatus === 'contacted') {
-                $msg = "<div class='alert text-info'>You have already claimed this lead.</div>";
+            // Handle Lead Locking 3-Claim Max
+            $claimedCount = (int)($lead['claimed_count'] ?? 0);
+            if ($claimedCount >= 3) {
+                $msg = "<div class='alert text-danger' style='border:1px solid #ff4455;'>Sorry, this lead has already been claimed by 3 members and is now locked permanently.</div>";
             } else {
-                $pdo->beginTransaction();
-                try {
-                    $pdo->prepare("UPDATE lead_dispatches SET status = 'claimed' WHERE lead_id = ? AND member_id = ?")->execute([$lead_id, $uid]);
-                    $newCount = $claimedCount + 1;
-                    if ($newCount >= 3) {
-                        $pdo->prepare("UPDATE public_leads SET claimed_count = ?, locked_at = NOW(), status = 'locked' WHERE id = ?")->execute([$newCount, $lead_id]);
-                    } else {
-                        $pdo->prepare("UPDATE public_leads SET claimed_count = ?, status = 'claimed' WHERE id = ?")->execute([$newCount, $lead_id]);
+                // Check if already claimed
+                $checkStmt = $pdo->prepare("SELECT status FROM lead_dispatches WHERE lead_id = ? AND member_id = ?");
+                $checkStmt->execute([$lead_id, $uid]);
+                $ldStatus = $checkStmt->fetchColumn();
+                
+                if ($ldStatus === 'claimed' || $ldStatus === 'contacted') {
+                    $msg = "<div class='alert text-info'>You have already claimed this lead.</div>";
+                } else {
+                    $pdo->beginTransaction();
+                    try {
+                        $pdo->prepare("UPDATE lead_dispatches SET status = 'claimed' WHERE lead_id = ? AND member_id = ?")->execute([$lead_id, $uid]);
+                        $newCount = $claimedCount + 1;
+                        if ($newCount >= 3) {
+                            $pdo->prepare("UPDATE public_leads SET claimed_count = ?, locked_at = NOW(), status = 'locked' WHERE id = ?")->execute([$newCount, $lead_id]);
+                        } else {
+                            $pdo->prepare("UPDATE public_leads SET claimed_count = ?, status = 'claimed' WHERE id = ?")->execute([$newCount, $lead_id]);
+                        }
+                        $pdo->commit();
+                        $msg = "<div class='alert text-success' style='border:1px solid #00ff88;'>Lead Details Unlocked Successfully! ($currentMonthClaims/$limit used)</div>";
+                    } catch(Exception $e) {
+                        $pdo->rollBack();
+                        $msg = "<div class='alert text-danger'>Database Error claiming lead.</div>";
                     }
-                    $pdo->commit();
-                    $msg = "<div class='alert text-success' style='border:1px solid #00ff88;'>Lead Details Unlocked Successfully!</div>";
-                } catch(Exception $e) {
-                    $pdo->rollBack();
-                    $msg = "<div class='alert text-danger'>Database Error claiming lead.</div>";
                 }
             }
         }

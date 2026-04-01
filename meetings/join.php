@@ -1,0 +1,42 @@
+<?php
+/**
+ * meetings/join.php
+ * Marks attendance and redirects user to the meeting link.
+ */
+require_once __DIR__ . "/../includes/db.php";
+require_once __DIR__ . "/../includes/auth_check.php";
+
+$user_id = $_SESSION['user_id'];
+$meeting_id = $_GET['id'] ?? 0;
+
+if (!$meeting_id) {
+    die("Invalid Meeting ID.");
+}
+
+// 1. Fetch Meeting Details
+$stmt = $pdo->prepare("SELECT meeting_link, status FROM networking_meetings WHERE id = ?");
+$stmt->execute([$meeting_id]);
+$meeting = $stmt->fetch();
+
+if (!$meeting) {
+    die("Meeting not found.");
+}
+
+// 2. Mark/Update Attendance
+$check = $pdo->prepare("SELECT id FROM networking_attendance WHERE meeting_id = ? AND user_id = ?");
+$check->execute([$meeting_id, $user_id]);
+$attendance = $check->fetch();
+
+if ($attendance) {
+    if ($attendance['status'] !== 'present') {
+        $up = $pdo->prepare("UPDATE networking_attendance SET status = 'present', joined_at = NOW() WHERE id = ?");
+        $up->execute([$attendance['id']]);
+    }
+} else {
+    $ins = $pdo->prepare("INSERT INTO networking_attendance (meeting_id, user_id, status, joined_at) VALUES (?, ?, 'present', NOW())");
+    $ins->execute([$meeting_id, $user_id]);
+}
+
+// 3. Redirect to Meeting Link
+header("Location: " . $meeting['meeting_link']);
+exit();

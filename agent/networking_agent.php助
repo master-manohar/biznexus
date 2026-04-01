@@ -1,0 +1,88 @@
+<?php
+/**
+ * agent/networking_agent.php
+ * Handles automated weekly meetings, AI business tips, and meeting notifications.
+ */
+require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/ai_helper_v3.php';
+require_once __DIR__ . '/../includes_functions.php';
+
+// Security Key (Required for Pulse Trigger)
+if (!isset($_GET['key']) || $_GET['key'] !== 'BizCron2024') {
+    die("Unauthorized Agent Run");
+}
+
+echo "--- BIZNEXUS NETWORKING AGENT Pulse ---\n";
+
+/**
+ * 1. AUTOMATED WEEKLY MEETING GENERATION
+ * Target: Every Monday morning, create a master meeting if it doesn't exist.
+ */
+$dayOfWeek = date('N'); // 1 (Monday) to 7 (Sunday)
+if ($dayOfWeek == 1) { // 1 = Monday
+    $currentWeek = date('W');
+    $currentYear = date('Y');
+    
+    // Check if a weekly master meeting exists for this week
+    $check = $pdo->prepare("SELECT id FROM networking_meetings WHERE meeting_type = 'weekly_master' AND YEARWEEK(scheduled_at, 1) = ?");
+    $check->execute([$currentYear . $currentWeek]);
+    
+    if (!$check->fetch()) {
+        echo "Master meeting for Week $currentWeek not found. Generating...\n";
+        
+        // Generate AI Business Tip
+        $prompt = "Generate a concise, powerful business tip for entrepreneurs in India for the week of " . date('d M Y') . ". 
+                  Focus on networking, sales, or local growth. Max 3 sentences.";
+        $tip = runBizAIString($prompt, "You are a senior business consultant for BizNexus.");
+        
+        // Schedule for next Morning at 8 AM (or today if it's before 8 AM)
+        $scheduled_time = date('Y-m-d') . " 08:30:00"; 
+        
+        $ins = $pdo->prepare("INSERT INTO networking_meetings (host_id, meeting_type, title, description, meeting_link, ai_business_tip, scheduled_at, status) 
+                             VALUES (?, 'weekly_master', ?, ?, ?, ?, ?, 'pending')");
+        $ins->execute([
+            1, // System Admin
+            "BizNexus Weekly Networking Masterclass - Week $currentWeek",
+            "Join our weekly networking session to connect with business leaders and share insights.",
+            "https://meet.google.com/lookup/biznexus-weekly", // Place holder
+            $tip,
+            $scheduled_time
+        ]);
+        
+        echo "✅ Weekly Master Meeting created for $scheduled_time.\n";
+    }
+}
+
+/**
+ * 2. NOTIFICATION ENGINE
+ * Send reminders and invitations for upcoming meetings.
+ */
+$now = date('Y-m-d H:i:s');
+$oneHourLater = date('Y-m-d H:i:s', strtotime('+1 hour'));
+
+$stmt = $pdo->prepare("SELECT * FROM networking_meetings WHERE status = 'pending' AND scheduled_at BETWEEN ? AND ?");
+$stmt->execute([$now, $oneHourLater]);
+$upcoming = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+foreach ($upcoming as $meeting) {
+    echo "Processing notifications for meeting: " . $meeting['title'] . "\n";
+    
+    // Logic to fetch users to notify
+    if ($meeting['meeting_type'] === 'weekly_master') {
+        // Notify ALL active business users
+        $users = $pdo->query("SELECT u.id, u.email FROM users u INNER JOIN business_profiles bp ON u.id = bp.user_id WHERE bp.is_verified = 1 LIMIT 100")->fetchAll(PDO::FETCH_ASSOC);
+    } else {
+        // Notify specific group members
+        $users = $pdo->prepare("SELECT u.id, u.email FROM users u INNER JOIN networking_attendance na ON u.id = na.user_id WHERE na.meeting_id = ?")->execute([$meeting['id']])->fetchAll(PDO::FETCH_ASSOC);
+    }
+    
+    foreach ($users as $u) {
+        // Placeholder for email/whatsapp sending
+        // In a real scenario, we'd use sendEmail() or wa_notify()
+        echo ">> Notifying User ID " . $u['id'] . " via " . $u['email'] . "\n";
+    }
+    
+    // (Optional) Update status to 'ongoing' if time is within 5 mins
+}
+
+echo "--- BIZNEXUS NETWORKING AGENT Pulse Finished ---\n";

@@ -1,0 +1,8 @@
+<?php
+require_once __DIR__ . '/../db.php';
+echo "<h3>Full Task Log (Outreach focus)</h3>";
+$tasks = $pdo->query("SELECT * FROM agent_tasks WHERE task_type='outreach_marketing' OR task_type='marketing_campaign' ORDER BY id DESC LIMIT 20")->fetchAll();
+echo "<pre>";
+print_r($tasks);
+echo "</pre>";
+助

@@ -10,17 +10,12 @@ $return_json = false; // flip to true for API-only calls
 
 $uid = (int)$_SESSION['user_id'];
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['success' => false, 'error' => 'Invalid method']);
-    exit;
-}
-
-$razorpay_payment_id = trim($_POST['razorpay_payment_id'] ?? '');
-$razorpay_order_id   = trim($_POST['razorpay_order_id'] ?? '');
-$razorpay_signature  = trim($_POST['razorpay_signature'] ?? '');
-$plan                = trim($_POST['plan'] ?? '');
-$billing             = trim($_POST['billing'] ?? 'monthly');
-$duration            = (int)($_POST['duration'] ?? 30);
+$razorpay_payment_id = trim($_REQUEST['razorpay_payment_id'] ?? '');
+$razorpay_order_id   = trim($_REQUEST['razorpay_order_id'] ?? '');
+$razorpay_signature  = trim($_REQUEST['razorpay_signature'] ?? '');
+$plan                = trim($_REQUEST['plan'] ?? '');
+$billing             = trim($_REQUEST['billing'] ?? 'monthly');
+$duration            = (int)($_REQUEST['duration'] ?? 30);
 
 if (!$razorpay_payment_id || !$razorpay_order_id || !$razorpay_signature || !$plan) {
     echo json_encode(['success' => false, 'error' => 'Missing payment data']);
@@ -43,16 +38,26 @@ if (!isset($plans[$plan])) {
 }
 
 try {
+    $coupon_code = trim($_POST['coupon'] ?? '');
+
     // Upgrade user plan — duration based on billing cycle
     $days    = ($billing === 'yearly') ? 365 : 30;
     $expires = date('Y-m-d H:i:s', strtotime("+$days days"));
     $pdo->prepare("UPDATE users SET plan=?, plan_expires_at=?, membership=? WHERE id=?")
         ->execute([$plan, $expires, $plan, $uid]);
 
+    // Handle Coupon usage tracking
+    if ($coupon_code) {
+        $pdo->prepare("UPDATE coupons SET uses = uses + 1 WHERE code = ?")->execute([$coupon_code]);
+    }
+
     // Log the transaction
+    $desc = "Upgraded to $plan plan via Razorpay. Payment: $razorpay_payment_id";
+    if ($coupon_code) $desc .= " (Coupon: $coupon_code applied)";
+
     $pdo->prepare("INSERT INTO coin_transactions(user_id, amount, type, description, created_at)
                    VALUES(?, 0, 'plan_upgrade', ?, NOW())")
-        ->execute([$uid, "Upgraded to $plan plan via Razorpay. Payment: $razorpay_payment_id"]);
+        ->execute([$uid, $desc]);
 
     // Award coins — higher for yearly
     $coinAward = $billing === 'yearly'

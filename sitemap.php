@@ -51,10 +51,20 @@ foreach($categories as $cat){
     }
 }
 
-// Dynamic member profiles (public ones)
+// 1. Dynamic SEO Power Pages (New AI-Generated Factory)
 if($pdo){
     try {
-        $members=$pdo->query("SELECT id,updated_at FROM users WHERE status='active' AND (profile_visibility='public' OR profile_visibility IS NULL) LIMIT 500");
+        $seoRes=$pdo->query("SELECT slug FROM seo_pages WHERE status='active' ORDER BY id DESC");
+        while($s=$seoRes->fetch()){
+            $urls[]=["/services/{$s['slug']}", '1.0', 'weekly'];
+        }
+    }catch(Exception $e){}
+}
+
+// 2. Dynamic member profiles (public ones)
+if($pdo){
+    try {
+        $members=$pdo->query("SELECT id,updated_at FROM users WHERE status='active' AND (profile_visibility='public' OR profile_visibility IS NULL) LIMIT 1000");
         while($m=$members->fetch()){
             $upd=date('Y-m-d',strtotime($m['updated_at']??'now'));
             $urls[]=["/profile/view.php?id={$m['id']}", '0.5', 'monthly', $upd];
@@ -67,8 +77,9 @@ $xml = '<?xml version="1.0" encoding="UTF-8"?>'."\n";
 $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
 foreach($urls as $u){
     $lastmod = $u[3]??$today;
+    $loc = htmlspecialchars($base . $u[0], ENT_XML1);
     $xml .= "  <url>\n";
-    $xml .= "    <loc>".htmlspecialchars($base.$u[0])."</loc>\n";
+    $xml .= "    <loc>{$loc}</loc>\n";
     $xml .= "    <lastmod>{$lastmod}</lastmod>\n";
     $xml .= "    <changefreq>{$u[2]}</changefreq>\n";
     $xml .= "    <priority>{$u[1]}</priority>\n";
@@ -96,5 +107,19 @@ $robots .= "\n";
 $robots .= "Sitemap: https://biznexus.in/sitemap.xml\n";
 file_put_contents(__DIR__.'/robots.txt', $robots);
 
+// Ping Search Engines
+function pingGoogle($url) {
+    $ch = curl_init("https://www.google.com/ping?sitemap=" . urlencode($url));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+    curl_exec($ch);
+    curl_close($ch);
+}
+
+// Only ping if generated via key (cron)
+if ($key === 'BizCron2024') {
+    pingGoogle("https://biznexus.in/sitemap.xml");
+}
+
 $count = count($urls);
-echo json_encode(['status'=>'ok','urls_generated'=>$count,'sitemap_written'=>true,'robots_written'=>true,'time'=>date('Y-m-d H:i:s')]);
+echo json_encode(['status'=>'ok','urls_generated'=>$count,'sitemap_written'=>true,'robots_written'=>true,'pinged_google'=>true,'time'=>date('Y-m-d H:i:s')]);

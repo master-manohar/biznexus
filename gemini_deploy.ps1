@@ -1,5 +1,5 @@
 $FTP_URL = "ftp://46.28.45.161"
-$FTP_USER = "u175452495.biznexus.in:Skn@123nch"
+$FTP_USER = "u175452495.biznexus.in:REPLACE_WITH_FTP_PASSWORD"
 $CURL = "C:\Windows\System32\curl.exe"
 
 # Folders to upload recursively

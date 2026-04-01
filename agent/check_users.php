@@ -1,8 +1,9 @@
 <?php
-require_once dirname(__DIR__) . '/includes/db.php';
-$stmt = $pdo->query("SELECT id, name, role, status FROM users LIMIT 10");
-$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-echo "<pre>";
-print_r($rows);
-echo "</pre>";
+require_once __DIR__ . '/../includes/db.php';
+header('Content-Type: text/plain');
+echo "--- DESCRIBE users ---\n";
+try {
+    $stmt = $pdo->query("DESCRIBE users");
+    print_r($stmt->fetchAll(PDO::FETCH_ASSOC));
+} catch (Exception $e) { echo "Error: " . $e->getMessage() . "\n"; }
 ?>

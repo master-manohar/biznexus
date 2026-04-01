@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
     <nav class="nav">
       <div class="container d-flex align-items-center justify-content-between">
-        <a href="/" class="logo">Biz<span>Nexus</span></a>
+        <a href="/" class="logo"><img src="/assets/img/logo-icon.png" alt="BizNexus" style="height:28px; width:auto; vertical-align:middle; margin-right:8px; filter: drop-shadow(0 0 5px rgba(255,215,0,0.5));">Biz<span>Nexus</span></a>
         <div><a href="/" class="btn btn-outline-light btn-sm rounded-pill px-3">← Back Home</a></div>
       </div>
     </nav>

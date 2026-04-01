@@ -1,0 +1,44 @@
+<?php
+/**
+ * agent/sys_check.php
+ * Diagnostic tool for BizNexus AI infrastructure.
+ */
+header('Content-Type: text/plain');
+echo "==== BIZNEXUS SYSTEM HEALTH CHECK ====\n";
+echo "PHP Version: " . phpversion() . "\n";
+echo "CURL: " . (extension_loaded('curl') ? 'ACTIVE' : 'MISSING') . "\n";
+echo "OpenSSL: " . (extension_loaded('openssl') ? 'ACTIVE' : 'MISSING') . "\n";
+echo "PDO MySQL: " . (extension_loaded('pdo_mysql') ? 'ACTIVE' : 'MISSING') . "\n";
+
+echo "\n--- Endpoint Check ---\n";
+$script = __DIR__ . '/../api/support_bot_chat.php';
+if (file_exists($script)) {
+    echo "Endpoint support_bot_chat.php: EXISTS\n";
+    $content = file_get_contents($script);
+    if (strpos($content, 'System Note:') !== false) {
+        echo "Verbose Debugging: ENABLED (Version Matches)\n";
+    } else {
+        echo "Verbose Debugging: MISSING (Version Mismatch - Old file detected)\n";
+    }
+} else {
+    echo "Endpoint support_bot_chat.php: NOT FOUND at $script\n";
+}
+
+echo "\n--- Secrets Check ---\n";
+$sec = __DIR__ . '/../includes/secrets.php';
+if (file_exists($sec)) {
+    $secrets = require $sec;
+    echo "Gemini Key: " . (empty($secrets['gemini_api_key']) ? 'MISSING' : 'CONFIGURED') . "\n";
+} else {
+    echo "Secrets File: NOT FOUND\n";
+}
+
+echo "\n--- Connectivity Check ---\n";
+$ch = curl_init("https://generativelanguage.googleapis.com/");
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // For local testing if needed
+curl_exec($ch);
+$info = curl_getinfo($ch);
+echo "Google Connect: " . ($info['http_code'] > 0 ? 'SUCCESS' : 'FAILED (' . curl_error($ch) . ')') . "\n";
+curl_close($ch);
+助

@@ -218,6 +218,7 @@ body{background:#06060a;color:#e0e0f0;font-family:'DM Sans',sans-serif}
             <input type="hidden" name="group_id" value="<?= $g['id'] ?>">
             <input type="hidden" name="action" value="leave">
             <div class="btn-joined" style="flex:1">✅ Joined</div>
+            <a href="/groups/members.php?id=<?= $g['id'] ?>" style="background:rgba(255,215,0,0.1); border:1px solid #FFD70044; color:#FFD700; border-radius:50px; padding:8px 14px; font-size:.75rem; text-decoration:none; display:inline-flex; align-items:center; gap:4px">👥 Members</a>
             <button type="submit" style="background:transparent;border:1px solid #2a2a3a;color:#555;border-radius:50px;padding:8px 14px;font-size:.75rem;cursor:pointer" onclick="return confirm('Leave this group?')">Leave</button>
           </form>
         <?php elseif($is_pending): ?>

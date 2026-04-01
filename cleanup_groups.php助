@@ -1,0 +1,30 @@
+<?php
+require_once __DIR__ . '/includes/db.php';
+$pdo->beginTransaction();
+try {
+    // 1. Find all "Elite" groups
+    $groups = $pdo->query("SELECT id, name FROM groups WHERE name LIKE '%Elite%' OR name LIKE '%Sreelakshmi%'")->fetchAll(PDO::FETCH_ASSOC);
+    
+    if (count($groups) > 0) {
+        // Keep the first one found as the primary
+        $primary = $groups[0];
+        $primaryId = $primary['id'];
+        
+        // Rename it
+        $pdo->prepare("UPDATE groups SET name = 'BizNexus Elite' WHERE id = ?")->execute([$primaryId]);
+        
+        // Move all users from the other "Elite" groups to this one
+        foreach ($groups as $idx => $g) {
+            if ($idx === 0) continue;
+            echo "Consolidating group " . $g['id'] . " into " . $primaryId . "\n";
+            $pdo->prepare("UPDATE users SET group_id = ? WHERE group_id = ?")->execute([$primaryId, $g['id']]);
+            $pdo->prepare("DELETE FROM groups WHERE id = ?")->execute([$g['id']]);
+        }
+    }
+    
+    $pdo->commit();
+    echo "SUCCESS: Groups consolidated and renamed to 'BizNexus Elite'.";
+} catch (Exception $e) {
+    $pdo->rollBack();
+    echo "ERROR: " . $e->getMessage();
+}

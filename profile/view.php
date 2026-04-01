@@ -10,9 +10,10 @@ if (!$profile_id) {
 }
 
 // Fetch member and profile
-$stmt = $pdo->prepare("SELECT u.id, u.name, u.plan, u.created_at, bp.* 
+$stmt = $pdo->prepare("SELECT u.id, u.name, u.plan, u.created_at, bp.*, b.website as b_website, b.slug as b_slug 
                        FROM users u 
                        LEFT JOIN business_profiles bp ON u.id = bp.user_id 
+                       LEFT JOIN businesses b ON u.id = b.user_id
                        WHERE u.id = ? AND u.status = 'active'");
 $stmt->execute([$profile_id]);
 $member = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -95,8 +96,9 @@ require_once __DIR__ . '/../includes/layout_start.php';
             </div>
             <div class="col-md-4 text-md-end mt-4 mt-md-0">
                 <a href="https://wa.me/<?= preg_replace('/[^0-9]/','',$member['whatsapp'] ?: '') ?>" target="_blank" class="btn btn-lg w-100 mb-3" style="background: var(--green); color: #000; font-weight: 800; border-radius: 12px;">Contact on WhatsApp</a>
-                <?php if ($member['website']): ?>
-                    <a href="<?= htmlspecialchars($member['website']) ?>" target="_blank" class="btn btn-outline-light btn-lg w-100" style="border-radius: 12px; border-color: var(--border);">Visit Website</a>
+                <?php $siteLink = !empty($member['b_slug']) ? '/sites/' . $member['b_slug'] . '/' : ''; ?>
+                <?php if ($siteLink): ?>
+                    <a href="<?= htmlspecialchars($siteLink) ?>" target="_blank" class="btn btn-outline-light btn-lg w-100 shadow-sm transition-all" style="border-radius: 12px; border-color: var(--border);"><i class="fa fa-globe mr-2"></i> View Website</a>
                 <?php endif; ?>
             </div>
         </div>

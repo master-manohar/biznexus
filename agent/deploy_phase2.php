@@ -362,14 +362,14 @@ function sendBizEmail(string $to, string $to_name, string $subject, string $body
 
 function emailTemplate(string $title, string $body, string $cta_text="", string $cta_url=""): string {
     $cta_block=$cta_text&&$cta_url?"<div style=\"text-align:center;margin:28px 0\"><a href=\"{$cta_url}\" style=\"display:inline-block;background:#FFD700;color:#000;padding:14px 36px;border-radius:50px;font-weight:800;font-size:.95rem;text-decoration:none;font-family:Syne,Arial,sans-serif\">{$cta_text}</a></div>":"";
-    return "<!DOCTYPE html><html><body style=\"background:#06060a;font-family:DM Sans,Arial,sans-serif;padding:40px 0\">
-    <div style=\"max-width:540px;margin:0 auto;background:#0e0e16;border:1px solid #1e1e2e;border-radius:16px;overflow:hidden\">
+    return "<!DOCTYPE html><html><body style=\"background:#06060a;font-family:DM Sans,Arial,sans-serif;padding:40px 0;color:#e0e0f0;\">
+    <div style=\"max-width:540px;margin:0 auto;background:#0e0e16;border:1px solid #1e1e2e;border-radius:16px;overflow:hidden;color:#e0e0f0;\">
       <div style=\"background:#0a0a12;padding:24px 32px;border-bottom:1px solid #1e1e2e;text-align:center\">
         <span style=\"font-family:Syne,Arial,sans-serif;font-size:1.4rem;font-weight:900;color:#FFD700\">⚡ BizNexus</span>
       </div>
-      <div style=\"padding:32px\">
+      <div style=\"padding:32px;color:#e0e0f0 !important;\">
         <h2 style=\"color:#e0e0f0;font-size:1.25rem;margin:0 0 16px\">{$title}</h2>
-        {$body}
+        <div style=\"color:#e0e0f0 !important;\">{$body}</div>
         {$cta_block}
         <p style=\"color:#444;font-size:.75rem;text-align:center;margin-top:24px\">BizNexus — India\'s AI Business Network<br>Questions? Reply to this email or contact <a href=\"mailto:hello@biznexus.in\" style=\"color:#FFD700\">hello@biznexus.in</a></p>
       </div>

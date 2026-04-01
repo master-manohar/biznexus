@@ -53,22 +53,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if (!$attendee) throw new Exception("Selected member does not exist.");
 
-            // 1. Deduct coins using ON DUPLICATE KEY UPDATE
+            // 1. Deduct coins and Award scheduling bonus
             if ($cost > 0) {
-                // Award coins with negative amount to deduct safely
-                $deductStmt = $pdo->prepare("
-                    INSERT INTO voocoin_balances (user_id, balance, total_earned, total_spent)
-                    VALUES (?, -?, 0, ?)
-                    ON DUPLICATE KEY UPDATE 
-                    balance = balance - ?, 
-                    total_spent = total_spent + ?
-                ");
-                $deductStmt->execute([$uid, $cost, $cost, $cost, $cost]);
-                
-                // Log transaction
-                $logStmt = $pdo->prepare("INSERT INTO coin_transactions (user_id, amount, type, description, created_at) VALUES (?, ?, 'debit', ?, NOW())");
-                $logStmt->execute([$uid, $cost, "Booked a $meeting_type meeting with {$attendee['name']}"]);
+                // Deduct cost
+                awardCoins($pdo, $uid, -$cost, "Meeting Cost ($meeting_type): " . $attendee['name']);
             }
+            
+            // Award scheduling bonus
+            awardCoins($pdo, $uid, 30, "Meeting Scheduled Bonus: " . $attendee['name']);
+            sendNotification($pdo, $uid, "Meeting Booked!", "You earned 30 VooCoins for scheduling a meeting.", 'coins');
 
             // 2. Insert Meeting
             $meetingLink = ($meeting_type === 'online' || $meeting_type === 'priority') ? "meet.google.com/" . substr(md5(time() . $uid), 0, 10) : "";

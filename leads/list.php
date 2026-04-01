@@ -30,6 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['claim_lead_id'])) {
                 $pdo->prepare("UPDATE public_leads SET status='claimed', claimed_by=?, claimed_by_member_id=?, claimed_at=NOW() WHERE id=? AND status IN ('new','open')")
                     ->execute([$uid, $uid, $lid]);
                 try { sendNotification($pdo, $uid, "Lead Claimed", "You successfully claimed a new lead.", 'crm'); } catch(Exception $e){}
+                // Economy Update: -50 VooCoins for self-claim
+                awardCoins($pdo, $uid, -50, "Lead Claimed: ID $lid");
                 $claims_this_month++;
                 $msg = 'success:Lead claimed! You have used ' . $claims_this_month . '/' . ($claim_limit === PHP_INT_MAX ? '∞' : $claim_limit) . ' claims this month.';
             } else {
@@ -58,15 +60,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_lead_status'])
     } catch(Exception $e) { $msg = 'error:' . $e->getMessage(); }
 }
 
+// ── User's Business Category ──────────────────────────────────────────────
+$user_cat = $pdo->query("SELECT category FROM business_profiles WHERE user_id=$uid")->fetchColumn() ?: '';
+
 // ── Filters ────────────────────────────────────────────────────────────────
 $f_city   = trim($_GET['city'] ?? '');
-$f_cat    = trim($_GET['category'] ?? '');
+$f_cat    = trim($_GET['category'] ?? ''); // Manual filter
 $f_status = trim($_GET['status'] ?? '');
 $f_q      = trim($_GET['q'] ?? '');
 
 $where  = ["1=1"]; $params = [];
 if ($f_city)   { $where[] = "city LIKE ?";       $params[] = "%$f_city%"; }
-if ($f_cat)    { $where[] = "category LIKE ?";   $params[] = "%$f_cat%"; }
+
+// Enforce Category Restriction for non-admins
+if (!$is_admin && $user_cat) {
+    $where[] = "category = ?";
+    $params[] = $user_cat;
+    $f_cat = $user_cat; // Lock filter UI
+} else if ($f_cat) {
+    $where[] = "category LIKE ?";
+    $params[] = "%$f_cat%";
+}
+
 if ($f_status) { $where[] = "status = ?";         $params[] = $f_status; }
 if ($f_q)      { $where[] = "(name LIKE ? OR query LIKE ? OR intent LIKE ? OR category LIKE ?)"; $params = array_merge($params, ["%$f_q%","%$f_q%","%$f_q%","%$f_q%"]); }
 
@@ -310,10 +325,12 @@ require_once __DIR__ . '/../includes/layout_start.php';
                 <input type="hidden" name="update_lead_status" value="1">
                 <input type="hidden" name="lead_id" value="<?= $l['id'] ?>">
                 <select name="status" onchange="this.form.submit()" style="background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);font-size:.75rem;padding:4px 8px;border-radius:6px;outline:none;">
-                    <option value="open"   <?= $l['status']==='open' || $l['status']==='claimed'?'selected':'' ?>>Open</option>
+                    <option value="open"   <?= $l['status']==='open' || $l['status']==='claimed'?'selected':'' ?>>Open / Active</option>
                     <option value="hold"   <?= $l['status']==='hold'?'selected':'' ?>>On Hold</option>
-                    <option value="closed" <?= $l['status']==='closed'?'selected':'' ?>>Closed</option>
-                    <option value="open_pool" style="color:var(--red);">Release to Pool</option>
+                    <option value="closed" <?= $l['status']==='closed'?'selected':'' ?>>Closed / Won</option>
+                    <?php if ($is_admin): ?>
+                        <option value="open_pool" style="color:var(--red);">⚠️ Release to Pool (Admin)</option>
+                    <?php endif; ?>
                 </select>
             </form>
         <?php endif; ?>

@@ -33,56 +33,57 @@ try {
     ];
     
     foreach ($coreUrls as $url) {
-        $xml .= "  <url>\n    <loc>{$baseUrl}{$url}</loc>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>\n";
+        $loc = htmlspecialchars($baseUrl . $url, ENT_XML1);
+        $xml .= "  <url>\n    <loc>{$loc}</loc>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>\n";
     }
 
-    // Dynamic Category URLs for SEO indexing
+    // 2. Dynamic Category URLs
     $stmt = $pdo->query("SELECT DISTINCT category FROM users WHERE category IS NOT NULL AND category != ''");
     $categories = $stmt->fetchAll(PDO::FETCH_COLUMN);
     
     foreach ($categories as $cat) {
         $cleanCat = urlencode(trim($cat));
-        $xml .= "  <url>\n    <loc>{$baseUrl}/find.php?q={$cleanCat}</loc>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>\n";
+        $loc = htmlspecialchars($baseUrl . "/find.php?q=" . $cleanCat, ENT_XML1);
+        $xml .= "  <url>\n    <loc>{$loc}</loc>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>\n  </url>\n";
+    }
+
+    // 3. GENERATED SEO PAGES (The "Power Engine" pages)
+    $stmtSEO = $pdo->query("SELECT slug FROM seo_pages ORDER BY id DESC LIMIT 5000");
+    $seoPages = $stmtSEO->fetchAll(PDO::FETCH_COLUMN);
+    
+    foreach ($seoPages as $slug) {
+        $loc = htmlspecialchars($baseUrl . "/services/" . $slug, ENT_XML1);
+        $xml .= "  <url>\n    <loc>{$loc}</loc>\n    <changefreq>monthly</changefreq>\n    <priority>0.9</priority>\n  </url>\n";
     }
     
     $xml .= "</urlset>";
     file_put_contents($sitemapPath, $xml);
-    writeLog("Successfully updated sitemap.xml with " . (count($coreUrls) + count($categories)) . " URLs.");
+    writeLog("Successfully updated sitemap.xml with " . (count($coreUrls) + count($categories) + count($seoPages)) . " URLs.");
 
-    // 2. Generate SEO Tags using Claude AI for newest category if needed
+    // 4. Ping Search Engines
+    $sitemapUrl = urlencode($baseUrl . '/sitemap.xml');
+    file_get_contents("https://www.google.com/ping?sitemap=" . $sitemapUrl);
+    file_get_contents("https://www.bing.com/ping?sitemap=" . $sitemapUrl);
+    writeLog("Pushed sitemap update to Google and Bing.");
+
+    // 2. Generate SEO Tags using Gemini AI for newest category if needed
     // In a full implementation, we'd save these to a `seo_meta` table.
-    writeLog("Engaging Claude API to analyze newest search trends...");
+    writeLog("Engaging Gemini AI to analyze newest search trends...");
     
     // Randomize one category to optimize today to save tokens
     if (count($categories) > 0) {
         $targetCat = $categories[array_rand($categories)];
         
+        require_once dirname(__DIR__) . '/includes/ai_helper_v3.php';
+        
         $prompt = "Write a highly optimized 150-character SEO meta description and 5 comma-separated keywords for a B2B directory page targeting the category: '$targetCat' in India.";
         
         $sys = "You are an expert SEO marketer. Output raw text ONLY. Format: Meta: [text]\nKeywords: [text]";
-        $payload = [
-            'model' => 'claude-3-haiku-20240307',
-            'max_tokens' => 100,
-            'system' => $sys,
-            'messages' => [['role' => 'user', 'content' => $prompt]]
-        ];
         
-        $ch = curl_init('https://api.anthropic.com/v1/messages');
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'x-api-key: ' . $claudeApiKey,
-            'anthropic-version: 2023-06-01',
-            'content-type: application/json'
-        ]);
+        $result = runBizAI([['role' => 'user', 'content' => $prompt]], $sys);
         
-        $res = curl_exec($ch);
-        curl_close($ch);
-        
-        $data = json_decode($res, true);
-        if (isset($data['content'][0]['text'])) {
-            $seoContent = trim($data['content'][0]['text']);
+        if (isset($result['text'])) {
+            $seoContent = trim($result['text']);
             writeLog("AI Optimization Success for '$targetCat':\n" . $seoContent);
         } else {
             writeLog("AI Optimization skipped or failed structure check.");

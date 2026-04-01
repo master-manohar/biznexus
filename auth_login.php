@@ -53,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login – BizNexus</title>
+    <link rel="icon" type="image/png" href="/assets/img/logo-icon.png">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -280,7 +281,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="auth-wrapper">
 
     <div class="brand">
-        <div class="brand-logo">Biz<span>Nexus</span></div>
+        <div class="brand-logo"><img src="/assets/img/logo-icon.png" alt="BizNexus" style="height:32px; vertical-align:middle; margin-right:8px; filter: drop-shadow(0 0 5px rgba(255,215,0,0.5));">Biz<span>Nexus</span></div>
         <div class="brand-sub">India's Premier Business Network</div>
     </div>
 

@@ -15,6 +15,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_status'])) {
     if (in_array($new_status, ['pending', 'inprogress', 'completed', 'rejected', 'closed'])) {
         $pdo->prepare("UPDATE referrals SET status = ? WHERE id = ? AND (sender_id = ? OR receiver_id = ?)")
             ->execute([$new_status, $rid, $uid, $uid]);
+            
+        // Reward: Referral Accepted (+100 🪙 to the sender)
+        if ($new_status === 'inprogress' || $new_status === 'completed') {
+            // Check if already rewarded
+            $chk = $pdo->prepare("SELECT sender_id, coins_rewarded FROM referrals WHERE id = ?");
+            $chk->execute([$rid]);
+            $ref = $chk->fetch();
+            if ($ref && !$ref['coins_rewarded']) {
+                awardCoins($pdo, $ref['sender_id'], 100, "Referral Accepted: ID $rid");
+                $pdo->prepare("UPDATE referrals SET coins_rewarded = 1 WHERE id = ?")->execute([$rid]);
+                sendNotification($pdo, $ref['sender_id'], "Referral Accepted!", "Your referral was accepted! You earned 100 VooCoins.", 'coins');
+            }
+        }
     }
 }
 

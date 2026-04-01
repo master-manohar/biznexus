@@ -125,7 +125,7 @@ require_once __DIR__ . '/../includes/header.php';
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label" style="color: #888; font-size: 0.85rem;">Referred Person's Phone *</label>
-                        <input type="text" name="referred_phone" class="form-control" style="background:#0f0f18;border-color:#2a2a3a;color:#e0e0f0" placeholder="e.g. 9876543210" required>
+                        <input type="text" name="referred_phone" class="form-control" style="background:#0f0f18;border-color:#2a2a3a;color:#e0e0f0" placeholder="e.g. 0000000000" required>
                     </div>
                 </div>
 

@@ -3,6 +3,20 @@
 define("BASE",__DIR__);
 require_once BASE."/includes/db.php";
 
+// --- Subdomain Routing for AI Generated Sites ---
+$host = $_SERVER['HTTP_HOST'] ?? '';
+if ($host && strpos($host, 'biznexus.in') !== false && !in_array($host, ['biznexus.in', 'www.biznexus.in'])) {
+    $parts = explode('.', $host);
+    if (count($parts) >= 3) {
+        $slug = $parts[0];
+        $sitePath = __DIR__ . "/sites/$slug/index.php";
+        if (file_exists($sitePath)) {
+            include $sitePath;
+            exit;
+        }
+    }
+}
+
 // Fetch actual counts
 function qn($pdo,$sql){try{return $pdo->query($sql)->fetchColumn();}catch(Throwable $e){return 0;}}
 $db_members = qn($pdo,"SELECT COUNT(*) FROM users WHERE status='active'");
@@ -29,6 +43,7 @@ $logged_in = isset($_SESSION['user_id']);
 <meta property="og:image" content="https://biznexus.in/assets/img/og-preview.jpg">
 <meta property="og:type" content="website">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" type="image/png" href="/assets/img/logo-icon.png">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
 :root{--g:#FFD700;--gr:#00ff88;--bg:#06060a;--c:#0e0e16;--b:#1e1e2e;--m:#555}
@@ -37,7 +52,7 @@ $logged_in = isset($_SESSION['user_id']);
 .logo{font-family:'Syne',sans-serif;font-size:1.35rem;font-weight:800;color:var(--g)} .logo span{color:var(--gr)}
 .nav a{color:#888;font-size:.86rem;transition:.15s} .nav a:hover{color:var(--g)}
 .btn-login{border:1px solid rgba(255,215,0,.3);color:var(--g);border-radius:50px;padding:7px 18px;font-size:.82rem;font-weight:600;transition:.2s}
-.btn-login:hover{background:var(--g);color:#000}
+.btn-login:hover{background:var(--g);color:#000;box-shadow:0 0 15px rgba(255,215,0,0.3)}
 .btn-join{background:var(--g);color:#000;border-radius:50px;padding:7px 20px;font-size:.82rem;font-weight:700;transition:.2s}
 .btn-join:hover{background:#e0a800}
 .hero{min-height:100vh;display:flex;align-items:center;padding:100px 0 60px;overflow:hidden;position:relative}
@@ -45,16 +60,16 @@ $logged_in = isset($_SESSION['user_id']);
 .badge-live{display:inline-flex;align-items:center;gap:7px;background:rgba(255,215,0,.07);border:1px solid rgba(255,215,0,.17);border-radius:50px;padding:6px 14px;font-size:.73rem;font-weight:600;color:var(--g);margin-bottom:20px}
 .dot{width:6px;height:6px;border-radius:50%;background:var(--gr);animation:blink 1.6s infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
-h1{font-family:'Syne',sans-serif;font-size:clamp(2.4rem,5vw,3.7rem);font-weight:800;line-height:1.1;letter-spacing:-1px;margin-bottom:16px}
+h1{font-family:'Syne',sans-serif;font-size:clamp(2.1rem,4.5vw,3.2rem);font-weight:800;line-height:1.1;letter-spacing:-1px;margin-bottom:16px}
 .sub{color:var(--m);font-size:1rem;line-height:1.75;max-width:470px;margin-bottom:30px} .sub strong{color:#ccc}
 .ctas{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:38px}
-.btn-main{background:var(--g);color:#000;padding:13px 32px;border-radius:50px;font-weight:800;font-size:.96rem;font-family:'Syne',sans-serif;transition:.2s;display:inline-block}
+.btn-main{background:var(--g);color:#000;padding:11px 28px;border-radius:50px;font-weight:800;font-size:.92rem;font-family:'Syne',sans-serif;transition:.2s;display:inline-block}
 .btn-main:hover{background:#e0a800;transform:translateY(-2px)}
 .btn-sec{border:1px solid #252535;color:#bbb;padding:13px 24px;border-radius:50px;font-size:.9rem;transition:.2s;display:inline-block}
 .btn-sec:hover{border-color:var(--gr);color:var(--gr)}
 .hnums{display:flex;gap:28px;flex-wrap:wrap}
-.hn{font-family:'Syne',sans-serif;font-size:1.55rem;font-weight:800;color:var(--g);line-height:1}
-.hl{font-size:.67rem;color:var(--m);text-transform:uppercase;letter-spacing:.6px;margin-top:2px}
+.hn{font-family:'Syne',sans-serif;font-size:1.45rem;font-weight:800;color:var(--g);line-height:1;text-align:center}
+.hl{font-size:.67rem;color:var(--m);text-transform:uppercase;letter-spacing:.6px;margin-top:2px;text-align:center}
 .scene{position:relative;height:430px}
 .fc{position:absolute;background:var(--c);border:1px solid var(--b);border-radius:14px;padding:14px 17px;min-width:155px}
 .fc .v{font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:800;line-height:1.2} .fc .s{font-size:.69rem;color:var(--m);margin-top:2px}
@@ -75,7 +90,7 @@ h1{font-family:'Syne',sans-serif;font-size:clamp(2.4rem,5vw,3.7rem);font-weight:
 .strip{background:var(--c);border-top:1px solid var(--b);border-bottom:1px solid var(--b);padding:22px 0}
 .sn{font-family:'Syne',sans-serif;font-size:1.85rem;font-weight:800;color:var(--g)} .sl{font-size:.71rem;color:var(--m);text-transform:uppercase;letter-spacing:.5px}
 .sec{padding:72px 0} .stag{font-size:.67rem;font-weight:700;text-transform:uppercase;letter-spacing:2.5px;color:var(--g);margin-bottom:10px}
-.stitle{font-family:'Syne',sans-serif;font-size:clamp(1.65rem,4vw,2.4rem);font-weight:800;line-height:1.15;margin-bottom:12px}
+.stitle{font-family:'Syne',sans-serif;font-size:clamp(1.5rem,3.5vw,2.15rem);font-weight:800;line-height:1.15;margin-bottom:12px}
 .fcard{background:var(--c);border:1px solid var(--b);border-radius:16px;padding:24px;transition:.25s;height:100%;position:relative}
 .fcard:hover{border-color:rgba(255,215,0,.25);transform:translateY(-4px)}
 .fcard:hover::after{opacity:1}
@@ -95,7 +110,7 @@ footer a{color:var(--m);font-size:.8rem;display:block;margin-bottom:7px;transiti
 </style></head><body>
 <nav class="nav">
   <div class="container d-flex align-items-center justify-content-between">
-    <a href="/" class="logo">Biz<span>Nexus</span></a>
+    <a href="/" class="logo"><img src="/assets/img/logo-icon.png" alt="BizNexus" style="height:28px; width:auto; vertical-align:middle; margin-right:8px; filter: drop-shadow(0 0 5px rgba(255,215,0,0.5));">Biz<span>Nexus</span></a>
     <div class="d-none d-md-flex gap-4"><a href="/find.php">Find Business</a><a href="/pages/pricing.php">Pricing</a><a href="/help.php">Help</a></div>
     <div class="d-flex gap-2">
       <?php if($logged_in): ?>
@@ -113,6 +128,12 @@ footer a{color:var(--m);font-size:.8rem;display:block;margin-bottom:7px;transiti
       <div class="col-lg-6">
         <div class="badge-live"><span class="dot"></span>100% Better AI Matching</div>
         <h1>Where Indian<br><span style="color:var(--g)">Businesses</span><br><span style="color:var(--gr)">Connect &amp; Grow</span></h1>
+        
+        <!-- Premium Universal Search Integration -->
+        <div style="margin: 25px 0 35px -15px;">
+            <?php include 'includes/search_bar_component.php'; ?>
+        </div>
+
         <p class="sub">BizNexus connects <strong>Indian SMEs</strong> through AI-powered leads, referrals, and networking groups.<br><br><span style="color:var(--g); font-weight:600;">Stop spending ₹5 Lakhs on dead directory listings. Get AI-matched, verified B2B leads for just ₹15k/year.</span></p>
         <div class="ctas">
           <a href="/auth/register.php" class="btn-main">Start for Free →</a>

@@ -1,0 +1,15 @@
+# BizNexus Master SEO Engine
+RewriteEngine On
+
+# 1. Universal SEO Power Pages
+# Redirects biznexus.in/services/category-in-city to seo_viewer.php
+RewriteRule ^services/([^/]+)/?$ seo_viewer.php?slug=$1 [L,QSA]
+
+# 2. Existing Category/City Search
+RewriteRule ^find/?$ find.php [L,QSA]
+RewriteRule ^find/([^/]+)/([^/]+)/?$ seo_page.php?category=$1&city=$2 [L,QSA]
+
+# 3. Handle trailing slashes & pretty URLs
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([^\.]+)$ $1.php [NC,L]

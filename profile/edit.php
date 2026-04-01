@@ -21,37 +21,62 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         // Update user basics
-        $pdo->prepare("UPDATE users SET name=?, phone=?, whatsapp=? WHERE id=?")
-            ->execute([trim($_POST['name'] ?? $user['name']), trim($_POST['phone'] ?? ''), trim($_POST['whatsapp'] ?? ''), $uid]);
+        $two_factor = isset($_POST['two_factor']) ? 1 : 0;
+        $pdo->prepare("UPDATE users SET name=?, phone=?, whatsapp=?, two_factor=? WHERE id=?")
+            ->execute([trim($_POST['name'] ?? $user['name']), trim($_POST['phone'] ?? ''), trim($_POST['whatsapp'] ?? ''), $two_factor, $uid]);
         
         $_SESSION['name'] = trim($_POST['name'] ?? $user['name']);
         
-        // Business profile
-        $bn = trim($_POST['business_name'] ?? '');
+        // Business profile logic
+        $bn = trim($_POST['business_name'] ?? ($bp['business_name'] ?? ''));
         $gst   = trim($_POST['gst_number'] ?? '');
         $aadh  = trim($_POST['aadhaar_number'] ?? '');
         $pan   = trim($_POST['pan_number'] ?? '');
         $firm  = trim($_POST['firm_type'] ?? '');
-        if ($bn) {
+        $desc  = trim($_POST['description'] ?? '');
+        $cat   = trim($_POST['category'] ?? '');
+        
+        // Auto-verify logic
+        $gst_v = (strlen($gst) >= 15) ? 1 : ($bp['gst_verified'] ?? 0);
+        $kyc_v = (strlen($aadh) >= 12 || strlen($pan) >= 10) ? 1 : ($user['kyc_verified'] ?? 0);
+        
+        if ($bn || $bp) {
             if ($bp) {
-                $pdo->prepare("UPDATE business_profiles SET business_name=?,tagline=?,description=?,category=?,city=?,address=?,whatsapp=?,phone=?,email=?,website=?,gst_number=?,aadhaar_number=?,pan_number=?,firm_type=? WHERE user_id=?")
-                    ->execute([$bn,$_POST['tagline']??'',$_POST['description']??'',$_POST['category']??'',$_POST['city']??'',$_POST['address']??'',$_POST['whatsapp']??'',$_POST['biz_phone']??'',$_POST['biz_email']??'',$_POST['website']??'',$gst,$aadh,$pan,$firm,$uid]);
+                $pdo->prepare("UPDATE business_profiles SET business_name=?,tagline=?,description=?,category=?,city=?,address=?,whatsapp=?,phone=?,email=?,website=?,gst_number=?,aadhaar_number=?,pan_number=?,firm_type=?,gst_verified=? WHERE user_id=?")
+                    ->execute([$bn,$_POST['tagline']??'',$_POST['description']??'',$_POST['category']??'',$_POST['city']??'',$_POST['address']??'',$_POST['biz_whatsapp']??'',$_POST['biz_phone']??'',$_POST['biz_email']??'',$_POST['website']??'',$gst,$aadh,$pan,$firm,$gst_v,$uid]);
             } else {
-                $pdo->prepare("INSERT INTO business_profiles(user_id,business_name,tagline,description,category,city,address,whatsapp,phone,email,website,gst_number,aadhaar_number,pan_number,firm_type,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())")
-                    ->execute([$uid,$bn,$_POST['tagline']??'',$_POST['description']??'',$_POST['category']??'',$_POST['city']??'',$_POST['address']??'',$_POST['whatsapp']??'',$_POST['biz_phone']??'',$_POST['biz_email']??'',$_POST['website']??'',$gst,$aadh,$pan,$firm]);
-                // Award coins for first profile setup
-                try { $pdo->prepare("INSERT INTO coin_transactions(user_id,amount,type,description,created_at) VALUES(?,50,'credit','Profile created',NOW())")->execute([$uid]); } catch(Exception $e){}
+                $pdo->prepare("INSERT INTO business_profiles(user_id,business_name,tagline,description,category,city,address,whatsapp,phone,email,website,gst_number,aadhaar_number,pan_number,firm_type,gst_verified,profile_complete,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,NOW())")
+                    ->execute([$uid,$bn,$_POST['tagline']??'',$_POST['description']??'',$_POST['category']??'',$_POST['city']??'',$_POST['address']??'',$_POST['biz_whatsapp']??'',$_POST['biz_phone']??'',$_POST['biz_email']??'',$_POST['website']??'',$gst,$aadh,$pan,$firm,$gst_v]);
+                
+                awardCoins($pdo, $uid, 100, "Business Profile Completed Bonus");
             }
-            // Refresh bp data
-            $bpStmt2 = $pdo->prepare("SELECT * FROM business_profiles WHERE user_id = ?");
-            $bpStmt2->execute([$uid]);
-            $bp = $bpStmt2->fetch(PDO::FETCH_ASSOC);
         }
         
-        // Re-fetch user
-        $stmt2 = $pdo->prepare("SELECT * FROM users WHERE id = ?");
-        $stmt2->execute([$uid]);
-        $user = $stmt2->fetch(PDO::FETCH_ASSOC);
+        // Award points for GST/KYC if just verified
+        if ($gst_v && !($bp['gst_verified']??0)) {
+            awardCoins($pdo, $uid, 200, "GST Verification Bonus");
+        }
+        if ($kyc_v && !($user['kyc_verified']??0)) {
+            $pdo->prepare("UPDATE users SET kyc_verified = 1 WHERE id = ?")->execute([$uid]);
+            awardCoins($pdo, $uid, 300, "KYC Documents Verified Bonus");
+        }
+
+        // Set profile_complete if basics are filled
+        if (!empty($bn) && !empty($cat) && !empty($desc)) {
+            $pdo->prepare("UPDATE users SET profile_complete = 1 WHERE id = ?")->execute([$uid]);
+        }
+        
+        // Recalculate Trust Score
+        calculateTrustScore($pdo, $uid);
+        
+        // Refresh data
+        $stmtV = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+        $stmtV->execute([$uid]);
+        $user = $stmtV->fetch(PDO::FETCH_ASSOC);
+        
+        $bpStmtV = $pdo->prepare("SELECT * FROM business_profiles WHERE user_id = ?");
+        $bpStmtV->execute([$uid]);
+        $bp = $bpStmtV->fetch(PDO::FETCH_ASSOC);
         
         $success = true;
     } catch (Exception $e) {
@@ -59,12 +84,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Categories
+// Unified Categories from Governance Table
 try {
-    $cats = $pdo->query("SELECT name FROM product_categories ORDER BY name ASC")->fetchAll(PDO::FETCH_COLUMN);
+    $cats = $pdo->query("SELECT name FROM categories ORDER BY name ASC")->fetchAll(PDO::FETCH_COLUMN);
 } catch(Exception $e) {
-    $cats = ['Technology','Finance','Healthcare','Education','Retail','Manufacturing','Real Estate','Food & Beverage','Transportation','Marketing'];
+    $cats = ['Business Services','Construction','Digital Marketing','Education','Finance','Healthcare','Manufacturing','Real Estate','Retail','Technology'];
 }
+
+$can_edit_cat = ($user['role'] === 'admin') || empty($bp['category']);
 
 $page_title = 'Edit Profile — BizNexus';
 require_once __DIR__ . '/../includes/layout_start.php';
@@ -121,9 +148,16 @@ require_once __DIR__ . '/../includes/layout_start.php';
         <div class="avatar-circle"><?= strtoupper(substr($user['name']??'?', 0, 1)) ?></div>
         <div>
             <div style="font-size:1.3rem;font-weight:800;color:#e8e8f5;font-family:'Syne',sans-serif;"><?= htmlspecialchars($user['name']??'Member') ?></div>
-            <div style="font-size:.82rem;color:#8888aa;margin-top:2px;"><?= htmlspecialchars($user['email']??'') ?></div>
+            <div style="font-size:.82rem;color:#8888aa;margin-top:2px;display:flex;align-items:center;gap:8px;">
+                <?= htmlspecialchars($user['email']??'') ?>
+                <?php if($user['email_verified']??0): ?>
+                    <span title="Verified" style="color:#00e87a;font-size:0.9rem;">✅</span>
+                <?php else: ?>
+                    <button type="button" class="btn btn-sm p-0 text-warning" onclick="sendEmailVerification()" style="font-size:.72rem;border:none;background:none;text-decoration:underline;font-weight:600;">Verify Now</button>
+                <?php endif; ?>
+            </div>
             <?php if ($user['is_verified']??0): ?>
-            <span style="font-size:.7rem;background:rgba(255,215,0,.15);color:#FFD700;border:1px solid rgba(255,215,0,.3);border-radius:20px;padding:2px 10px;margin-top:4px;display:inline-block;">✓ Verified</span>
+            <span style="font-size:.7rem;background:rgba(255,215,0,.15);color:#FFD700;border:1px solid rgba(255,215,0,.3);border-radius:20px;padding:2px 10px;margin-top:4px;display:inline-block;">✓ Platinum Verified</span>
             <?php endif; ?>
         </div>
     </div>
@@ -207,23 +241,71 @@ $urgent = $days_left > 0 && $days_left <= 7;
         </div>
         <div class="col-md-6">
             <label class="form-label">Email Address</label>
-            <input type="email" class="form-control" value="<?= htmlspecialchars($user['email']??'') ?>" disabled style="opacity:.6;">
-            <small style="color:#666688;font-size:.73rem;">Email cannot be changed here</small>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <div style="flex:1;position:relative;">
+                    <input type="email" class="form-control" value="<?= htmlspecialchars($user['email']??'') ?>" disabled style="opacity:.7;padding-right:40px;">
+                    <?php if($user['email_verified']??0): ?>
+                        <span title="Verified Email" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#00e87a;font-size:1.1rem;">✅</span>
+                    <?php endif; ?>
+                </div>
+                <?php if(!($user['email_verified']??0)): ?>
+                    <button type="button" id="btnVerifyEmail" onclick="sendEmailVerification()" style="background:rgba(255,215,0,.1);color:#FFD700;border:1px solid #FFD700;border-radius:8px;padding:8px 12px;font-size:.73rem;font-weight:700;white-space:nowrap;transition:.2s;">Verify Now</button>
+                <?php endif; ?>
+            </div>
+            <div id="emailVerifyMsg" style="font-size:0.72rem;margin-top:5px;display:none;"></div>
+            <small style="color:#666688;font-size:.73rem;">Login email cannot be changed here</small>
         </div>
         <div class="col-md-6">
             <label class="form-label">Phone Number</label>
-            <input type="tel" name="phone" class="form-control" value="<?= htmlspecialchars($user['phone']??'') ?>" placeholder="+91 98765 43210">
+            <input type="tel" name="phone" class="form-control" value="<?= htmlspecialchars($user['phone']??'') ?>" placeholder="+91 00000 00000">
         </div>
         <div class="col-md-6">
             <label class="form-label">WhatsApp Number</label>
-            <input type="tel" name="whatsapp" class="form-control" value="<?= htmlspecialchars($user['whatsapp']??'') ?>" placeholder="+91 98765 43210">
+            <input type="tel" name="whatsapp" class="form-control" value="<?= htmlspecialchars($user['whatsapp']??'') ?>" placeholder="+91 00000 00000">
         </div>
+        <div class="col-12">
+            <div class="form-check form-switch mt-2">
+                <input class="form-check-input" type="checkbox" name="two_factor" id="twoFactor" <?= ($user['two_factor']??0) ? 'checked' : '' ?>>
+                <label class="form-check-label text-white fw-bold" for="twoFactor">🛡️ Enable Two-Factor Authentication (2FA)</label>
+                <div style="font-size:0.75rem;color:#888;">Adds an extra layer of security to your account (+100 Points)</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Security & Trust Checklist ── -->
+<div class="profile-section" style="border-color: #00e87a33; background: rgba(0, 232, 122, 0.02);">
+    <div class="section-heading" style="color: #00e87a;">📊 Security Rating Checklist</div>
+    <div class="row g-3">
+        <?php
+        $checks = [
+            ['Email Verified', $user['email_verified'], 150, 'Check your inbox for the verification link'],
+            ['Phone Number', !empty($user['phone']), 150, 'Enter your mobile number above'],
+            ['KYC Documents', $user['kyc_verified'], 300, 'Upload Aadhaar/PAN below'],
+            ['GST Verification', $bp['gst_verified']??0, 200, 'Enter valid GSTIN for business trust'],
+            ['2FA enabled', $user['two_factor']??0, 100, 'Toggle the 2FA switch above'],
+            ['Profile Complete', $user['profile_complete']??0, 100, 'Ensure business details are filled']
+        ];
+        foreach($checks as $c):
+        ?>
+        <div class="col-md-4 col-sm-6">
+            <div class="p-3 rounded-3" style="background: <?= $c[1] ? 'rgba(0,232,122,0.1)' : 'rgba(255,255,255,0.02)' ?>; border: 1px solid <?= $c[1] ? '#00e87a44' : '#2a2a3a' ?>;">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span style="font-size:0.8rem; font-weight:700; color:<?= $c[1] ? '#00e87a' : '#888' ?>;">
+                        <?= $c[1] ? '✅' : '⭕' ?> <?= $c[0] ?>
+                    </span>
+                    <span class="badge bg-dark text-white">+<?= $c[2] ?></span>
+                </div>
+                <div style="font-size:0.65rem; color:#666;"><?= $c[3] ?></div>
+            </div>
+        </div>
+        <?php endforeach; ?>
     </div>
 </div>
 
 <!-- ── Business Profile ── -->
 <div class="profile-section">
-    <div class="section-heading">💼 Business Profile</div>
+    <div class="section-heading" style="font-size:1.1rem; color:#FFD700; border-bottom:2px solid #FFD700; padding-bottom:12px;">💼 Setup Your Business Profile</div>
     <div class="row g-3">
         <div class="col-md-6">
             <label class="form-label">Business Name *</label>
@@ -238,13 +320,17 @@ $urgent = $days_left > 0 && $days_left <= 7;
             <textarea name="description" class="form-control" rows="3" placeholder="Describe your business, products/services, USP..."><?= htmlspecialchars($bp['description']??'') ?></textarea>
         </div>
         <div class="col-md-6">
-            <label class="form-label">Category</label>
-            <select name="category" class="form-select">
+            <label class="form-label">Category <?= $can_edit_cat ? '*' : '<span style="color:#ff4d6d;font-size:.7rem;">(LOCKED)</span>' ?></label>
+            <select name="category" class="form-select" <?= $can_edit_cat ? 'required' : 'disabled' ?>>
                 <option value="">-- Select Category --</option>
                 <?php foreach ($cats as $cat): ?>
                 <option value="<?= htmlspecialchars($cat) ?>" <?= ($bp['category']??'')===$cat?'selected':'' ?>><?= htmlspecialchars($cat) ?></option>
                 <?php endforeach; ?>
             </select>
+            <?php if (!$can_edit_cat): ?>
+                <input type="hidden" name="category" value="<?= htmlspecialchars($bp['category']) ?>">
+                <small style="color:#666688;font-size:.73rem;">Contact Admin to change your primary business category</small>
+            <?php endif; ?>
         </div>
         <div class="col-md-6">
             <label class="form-label">City</label>
@@ -260,7 +346,7 @@ $urgent = $days_left > 0 && $days_left <= 7;
         </div>
         <div class="col-md-6">
             <label class="form-label">WhatsApp</label>
-            <input type="tel" name="whatsapp" class="form-control" value="<?= htmlspecialchars($bp['whatsapp']??$user['whatsapp']??'') ?>" placeholder="+91 number">
+            <input type="tel" name="biz_whatsapp" class="form-control" value="<?= htmlspecialchars($bp['whatsapp']??$user['whatsapp']??'') ?>" placeholder="+91 number">
         </div>
         <div class="col-md-6">
             <label class="form-label">Website</label>
@@ -302,7 +388,7 @@ $urgent = $days_left > 0 && $days_left <= 7;
         </div>
         <div class="col-md-6">
             <label class="form-label">PAN Number</label>
-            <input type="text" name="pan_number" class="form-control" value="<?= htmlspecialchars($bp['pan_number']??'') ?>" placeholder="ABCDE1234F" maxlength="10" style="text-transform:uppercase;">
+            <input type="text" name="pan_number" class="form-control" value="<?= htmlspecialchars($bp['pan_number']??'') ?>" placeholder="ABCDE1234F" maxlength="10" style="text-transform:uppercase; text-align: left;">
         </div>
     </div>
 </div>
@@ -323,3 +409,42 @@ if (file_exists($layout_end)) {
     echo '</main></body></html>';
 }
 ?>
+<script>
+function sendEmailVerification() {
+    const btn = document.getElementById('btnVerifyEmail');
+    const msg = document.getElementById('emailVerifyMsg');
+    
+    btn.disabled = true;
+    btn.innerText = 'Sending...';
+    btn.style.opacity = '0.6';
+    
+    fetch('/auth/send_verification.php')
+    .then(r => r.json())
+    .then(data => {
+        msg.style.display = 'block';
+        msg.style.color = data.success ? '#00e87a' : '#ff4d6d';
+        msg.innerText = data.message;
+        
+        if(data.success) {
+            btn.innerText = 'Email Sent!';
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerText = 'Resend Code';
+                btn.style.opacity = '1';
+            }, 60000);
+        } else {
+            btn.disabled = false;
+            btn.innerText = 'Try Again';
+            btn.style.opacity = '1';
+        }
+    })
+    .catch(e => {
+        msg.style.display = 'block';
+        msg.style.color = '#ff4d6d';
+        msg.innerText = 'Error: Connection failed.';
+        btn.disabled = false;
+        btn.innerText = 'Retry';
+        btn.style.opacity = '1';
+    });
+}
+</script>

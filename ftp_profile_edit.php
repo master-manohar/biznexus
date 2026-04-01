@@ -80,8 +80,23 @@ select option{background:#13131a}
 <div class="col-md-6"><label>Full Name</label><input type="text" name="name" value="<?=htmlspecialchars($user['name']??'')?>" required></div>
 <div class="col-md-6"><label>Phone</label><input type="tel" name="phone" value="<?=htmlspecialchars($user['phone']??'')?>"></div>
 </div>
-<label>Email (cannot change)</label>
-<input type="email" value="<?=htmlspecialchars($user['email']??'')?>" disabled style="opacity:.5;cursor:not-allowed">
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+    <div style="flex:1">
+        <label>Email Address (cannot change)</label>
+        <div style="position:relative">
+            <input type="email" value="<?=htmlspecialchars($user['email']??'')?>" disabled style="opacity:.6;cursor:not-allowed;margin-bottom:0;padding-right:45px">
+            <?php if($user['email_verified']): ?>
+                <span title="Verified Email" style="position:absolute;right:15px;top:50%;transform:translateY(-50%);color:#00ff88;font-size:1.2rem">✅</span>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php if(!$user['email_verified']): ?>
+        <div style="margin-top:22px">
+            <button type="button" id="btnVerify" onclick="sendVerification()" style="background:rgba(255,215,0,.1);color:#FFD700;border:1px solid #FFD700;border-radius:8px;padding:8px 16px;font-size:.82rem;font-weight:700;white-space:nowrap;transition:.2s">Verify Now</button>
+        </div>
+    <?php endif; ?>
+</div>
+<div id="verifyMsg" style="font-size:.82rem;margin-top:-8px;margin-bottom:14px;display:none"></div>
 </div>
 <div class="fc">
 <div class="sec">🏢 Business Info</div>
@@ -102,8 +117,8 @@ select option{background:#13131a}
 <div class="fc">
 <div class="sec">📞 Contact Details</div>
 <div class="row g-3">
-<div class="col-md-4"><label>WhatsApp</label><input type="tel" name="whatsapp" value="<?=htmlspecialchars($bp['whatsapp']??'')?>" placeholder="9876543210"></div>
-<div class="col-md-4"><label>Business Phone</label><input type="tel" name="biz_phone" value="<?=htmlspecialchars($bp['phone']??'')?>" placeholder="9876543210"></div>
+<div class="col-md-4"><label>WhatsApp</label><input type="tel" name="whatsapp" value="<?=htmlspecialchars($bp['whatsapp']??'')?>" placeholder="0000000000"></div>
+<div class="col-md-4"><label>Business Phone</label><input type="tel" name="biz_phone" value="<?=htmlspecialchars($bp['phone']??'')?>" placeholder="0000000000"></div>
 <div class="col-md-4"><label>Business Email</label><input type="email" name="biz_email" value="<?=htmlspecialchars($bp['email']??'')?>" placeholder="biz@email.com"></div>
 </div>
 <label>Website</label>
@@ -111,4 +126,45 @@ select option{background:#13131a}
 </div>
 <button type="submit" style="background:#FFD700;color:#000;border:none;border-radius:10px;padding:13px 36px;font-weight:800;font-size:1rem;cursor:pointer">💾 Save Profile</button>
 </form>
-</div></body></html>
+</div>
+<script>
+function sendVerification() {
+    const btn = document.getElementById('btnVerify');
+    const msg = document.getElementById('verifyMsg');
+    
+    btn.disabled = true;
+    btn.innerText = 'Sending...';
+    btn.style.opacity = '0.5';
+    
+    fetch('/auth/send_verification.php')
+    .then(r => r.json())
+    .then(data => {
+        msg.style.display = 'block';
+        msg.style.color = data.success ? '#00ff88' : '#ff8888';
+        msg.innerText = data.message;
+        
+        if(data.success) {
+            btn.innerText = 'Email Sent!';
+            // Re-enable after 60s
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerText = 'Resend Verification';
+                btn.style.opacity = '1';
+            }, 60000);
+        } else {
+            btn.disabled = false;
+            btn.innerText = 'Try Again';
+            btn.style.opacity = '1';
+        }
+    })
+    .catch(e => {
+        msg.style.display = 'block';
+        msg.style.color = '#ff8888';
+        msg.innerText = 'Error: Could not send request.';
+        btn.disabled = false;
+        btn.innerText = 'Retry';
+        btn.style.opacity = '1';
+    });
+}
+</script>
+</body></html>

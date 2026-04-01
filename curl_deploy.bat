@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 set "FTP_URL=ftp://46.28.45.161"
-set "FTP_USER=u175452495.biznexus.in:Skn@123nch"
+set "FTP_USER=u175452495.biznexus.in:REPLACE_WITH_FTP_PASSWORD"
 
 echo Starting deployment to 46.28.45.161...
 

@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body style="background: var(--bg); color: var(--text);">
 
 <div class="sidebar d-none d-md-flex">
-    <div class="sidebar-logo">⚡ BizNexus</div>
+    <div class="sidebar-logo"><img src="/assets/img/logo-icon.png" alt="BizNexus" style="height:24px; vertical-align:middle; margin-right:8px; filter: drop-shadow(0 0 5px rgba(255,215,0,0.5));">BizNexus</div>
     <nav class="nav flex-column" style="flex:1">
         <a class="nav-link" href="/dashboard/index.php">🏠 Dashboard</a>
         <a class="nav-link" href="/profile/edit.php">👤 My Profile</a>

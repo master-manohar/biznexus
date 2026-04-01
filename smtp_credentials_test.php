@@ -6,7 +6,7 @@ if ($key !== 'BizCron2024') { die('Unauthorized'); }
 $smtp_host = 'ssl://smtp.hostinger.com';
 $smtp_port = 465;
 $user = 'hello@biznexus.in';
-$passwords = ['Hello@biznexus1', 'Biz@9990', 'Skn@123nch', 'BizNexus@123', 'admin@123'];
+$passwords = ['REPLACE_SMTP_PASSWORD_1', 'REPLACE_SMTP_PASSWORD_2', 'REPLACE_FTP_PASSWORD', 'REPLACE_SMTP_PASSWORD_3', 'REPLACE_SMTP_PASSWORD_4'];
 
 foreach ($passwords as $pass) {
     echo "Testing Password: $pass ... ";

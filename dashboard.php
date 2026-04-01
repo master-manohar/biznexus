@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . "/includes/db.php";
 require_once __DIR__ . "/includes/auth.php";
-require_once __DIR__ . "/includes/functions.php";
+require_once __DIR__ . "/includes_functions.php";
 requireLogin();
 $user_id = getCurrentUserId();
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
@@ -14,6 +14,13 @@ $ref_count = $stmt2->fetchColumn();
 $stmt3 = $pdo->prepare("SELECT COUNT(*) FROM leads WHERE user_id = ?");
 $stmt3->execute([$user_id]);
 $leads_count = $stmt3->fetchColumn() ?? 0;
+
+$stmt_meetings = $pdo->prepare("SELECT * FROM networking_meetings WHERE status = 'pending' AND scheduled_at >= NOW() ORDER BY scheduled_at ASC LIMIT 2");
+$stmt_meetings->execute();
+$upcoming_meetings = $stmt_meetings->fetchAll(PDO::FETCH_ASSOC);
+
+$isAdmin = ($user['role'] === 'admin');
+$isPresident = ($user['group_role'] === 'president');
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -54,14 +61,50 @@ body{background:#0a0a0f;color:#e0e0f0;font-family:"Inter",sans-serif}
 <a href="/marketplace/list.php">🛒 Marketplace</a>
 <a href="/referrals/list.php">🤝 Referrals</a>
 <a href="/referrals/received.php">📥 Received</a>
-<a href="/meetings/schedule.php">📅 Meetings</a>
+<?php if ($isAdmin || $isPresident): ?>
+    <a href="/meetings/schedule.php">📅 Schedule Meeting</a>
+    <a href="/meetings/attendance.php">📊 Attendance Reports</a>
+<?php endif; ?>
 <a href="/leads.php">📊 Leads</a>
 <a href="/coins.php">🪙 VooCoins</a>
 <a href="/groups.php">👥 Groups</a>
+<a href="/groups/members.php">👥 My Group Members</a>
 <a href="/notifications.php">🔔 Notifications</a>
 </div>
 <div class="col-md-10 p-4">
-<h4 class="mb-4" style="color:#FFD700">Welcome back, <?=htmlspecialchars($user["name"] ?? "Member")?>! 👋</h4>
+<h4 class="mb-4" style="color:#FFD700">Welcome back, <?=htmlspecialchars($user["name"] ?? "Valued Member")?>! 👋</h4>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="stat-card">
+            <div class="section-title">🗓️ Upcoming Networking Events</div>
+            <?php if (empty($upcoming_meetings)): ?>
+                <p style="color:#666">No upcoming meetings scheduled. Check back later!</p>
+            <?php else: ?>
+                <div class="row">
+                    <?php foreach ($upcoming_meetings as $meeting): ?>
+                        <div class="col-md-6 mb-3">
+                            <div style="background:#1c1c27; border-radius:12px; padding:20px; border-left:4px solid #FFD700">
+                                <h5 style="color:#FFD700; font-weight:700"><?=htmlspecialchars($meeting['title'])?></h5>
+                                <p style="font-size:.85rem; color:#aaa">📅 <?=date('d M Y, h:i A', strtotime($meeting['scheduled_at']))?></p>
+                                
+                                <?php if ($meeting['ai_business_tip']): ?>
+                                    <div style="background:rgba(255,215,0,0.1); border-radius:8px; padding:12px; margin:15px 0; font-size:.88rem; font-style:italic">
+                                        <span style="color:#FFD700; font-weight:700">💡 Tip of the Week:</span><br>
+                                        <?=htmlspecialchars($meeting['ai_business_tip'])?>
+                                    </div>
+                                <?php endif; ?>
+                                
+                                <a href="/meetings/join.php?id=<?=$meeting['id']?>" target="_blank" class="btn btn-warning w-100 fw-bold">Join Meeting</a>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
 <div class="row">
 <div class="col-md-3">
 <div class="stat-card">
@@ -88,6 +131,7 @@ body{background:#0a0a0f;color:#e0e0f0;font-family:"Inter",sans-serif}
 </div>
 </div>
 </div>
+
 <div class="stat-card mt-2">
 <div class="section-title">Quick Actions</div>
 <div class="d-flex gap-3 flex-wrap">

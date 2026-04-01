@@ -71,6 +71,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $type = $_POST['type'] ?? 'info';
         sendNotification($pdo, $target_id, $title, $message, $type);
         $msg = "Notification sent to user ID $target_id.";
+    } elseif ($action === 'update_plan') {
+        $target_id = (int)$_POST['target_user_id'];
+        $new_plan = $_POST['new_plan'];
+        $pdo->prepare("UPDATE users SET plan = ? WHERE id = ?")->execute([$new_plan, $target_id]);
+        $msg = "User ID $target_id plan updated to $new_plan.";
     }
     header("Location: superadmin.php?msg=" . urlencode($msg ?? 'Action completed'));
     exit;
@@ -119,6 +124,8 @@ $members = $pdo->query("SELECT id, name, email, phone, plan, status, is_verified
         <a class='nav-link' href='/admin/users.php'>👥 Customer Data</a>
         <!-- FIXED: Added Leads Tracker link -->
         <a class='nav-link' href='/admin/leads.php'>🔥 Lead Tracker</a>
+        <!-- AIO Dominance Monitor -->
+        <a class='nav-link' href='/admin/seo_dashboard.php' style='color:#FFD700; font-weight:bold;'><i class='fas fa-chart-line'></i> 📈 AIO Dominance</a>
         <a class='nav-link' href='/dashboard/index.php'>⬅ Back to App</a>
     </nav>
     <a href='/auth/logout.php' style='color:#ff4455;padding:16px 20px;text-decoration:none;'>🚪 Logout</a>
@@ -254,10 +261,12 @@ $members = $pdo->query("SELECT id, name, email, phone, plan, status, is_verified
                             <td><?= htmlspecialchars($u['email']) ?></td>
                             <td><?= htmlspecialchars($u['phone']) ?></td>
                             <td>
-                                <!-- FIXED: Corrected PHP tag closure here to prevent HTTP 500 parse error -->
-                                <span class="badge-plan p-<?= htmlspecialchars($u['plan'] ?? 'free') ?>">
-                                    <?= htmlspecialchars($u['plan'] ?? 'free') ?>
-                                </span>
+                                <select onchange="updatePlan(<?= $u['id'] ?>, this.value)" class="form-select form-select-sm bg-dark text-white border-0" style="width:100px; font-size:0.75rem;">
+                                    <option value="free" <?= ($u['plan']=='free')?'selected':'' ?>>FREE</option>
+                                    <option value="silver" <?= ($u['plan']=='silver')?'selected':'' ?>>SILVER</option>
+                                    <option value="gold" <?= ($u['plan']=='gold')?'selected':'' ?>>GOLD</option>
+                                    <option value="platinum" <?= ($u['plan']=='platinum')?'selected':'' ?>>PLATINUM</option>
+                                </select>
                             </td>
                             <td class="s-<?= htmlspecialchars($u['status']) ?>"><?= htmlspecialchars($u['status']) ?></td>
                             <td><?= date('Y-m-d', strtotime($u['created_at'])) ?></td>
@@ -326,6 +335,14 @@ $members = $pdo->query("SELECT id, name, email, phone, plan, status, is_verified
 function setNotifUser(id, name) {
     document.getElementById('notifUserId').value = id;
     document.getElementById('notifUserName').innerText = name;
+}
+function updatePlan(userId, plan) {
+    if(!confirm("Change plan to " + plan + "?")) return;
+    let f = document.createElement("form");
+    f.method = "POST";
+    f.innerHTML = `<input type="hidden" name="action" value="update_plan"><input type="hidden" name="target_user_id" value="${userId}"><input type="hidden" name="new_plan" value="${plan}">`;
+    document.body.appendChild(f);
+    f.submit();
 }
 </script>
 </body>

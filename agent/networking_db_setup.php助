@@ -1,0 +1,38 @@
+<?php
+/**
+ * agent/networking_db_setup.php
+ * Initializes the networking and meeting ecosystem tables.
+ */
+require_once __DIR__ . '/../includes/db.php';
+
+try {
+    // 1. Create Meetings Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS networking_meetings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        host_id INT NOT NULL,
+        group_id INT DEFAULT NULL,
+        meeting_type ENUM('weekly_master', 'one_to_one', 'group_team') NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        meeting_link VARCHAR(255),
+        ai_business_tip TEXT,
+        scheduled_at DATETIME NOT NULL,
+        status ENUM('pending', 'ongoing', 'completed', 'cancelled') DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )");
+    echo "✅ Table 'networking_meetings' created.\n";
+
+    // 2. Create Attendance Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS networking_attendance (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        meeting_id INT NOT NULL,
+        user_id INT NOT NULL,
+        status ENUM('invited', 'present', 'absent') DEFAULT 'invited',
+        joined_at DATETIME DEFAULT NULL,
+        FOREIGN KEY (meeting_id) REFERENCES networking_meetings(id) ON DELETE CASCADE
+    )");
+    echo "✅ Table 'networking_attendance' created.\n";
+
+} catch (PDOException $e) {
+    die("❌ Migration Failed: " . $e->getMessage());
+}

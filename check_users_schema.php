@@ -1,6 +1,12 @@
 <?php
-require_once 'includes/db.php';
-global $pdo;
-$stmt = $pdo->query("DESCRIBE users");
-print_r($stmt->fetchAll(PDO::FETCH_ASSOC));
+require_once __DIR__ . '/includes/db.php';
+header('Content-Type: text/plain');
+try {
+    $stmt = $pdo->query("DESCRIBE users");
+    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        echo $row['Field'] . " (" . $row['Type'] . ")\n";
+    }
+} catch (Exception $e) {
+    echo "Error: " . $e->getMessage();
+}
 ?>

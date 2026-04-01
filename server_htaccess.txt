@@ -1,0 +1,4 @@
+# BizNexus SEO Engine
+RewriteEngine On
+RewriteRule ^find/?$ find.php [L,QSA]
+RewriteRule ^find/([^/]+)/([^/]+)/?$ find_category.php?category=$1&city=$2 [L,QSA]

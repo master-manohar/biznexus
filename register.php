@@ -1,9 +1,9 @@
 <?php
 session_start();
 if(isset($_SESSION["user_id"])){ header("Location: /dashboard/index.php"); exit; }
-define("BASE", dirname(__DIR__));
+define("BASE", __DIR__);
 require_once BASE . "/includes/db.php";
-require_once BASE . "/includes/functions.php";
+require_once BASE . "/includes_functions.php";
 $errors=[];
 if($_SERVER["REQUEST_METHOD"]==="POST"){
     $name    = trim($_POST["name"]??"");
@@ -23,9 +23,21 @@ if($_SERVER["REQUEST_METHOD"]==="POST"){
         } else {
             try{
                 $hash = password_hash($pass, PASSWORD_DEFAULT);
-                $stmtIns = $pdo->prepare("INSERT INTO users (name, email, phone, password, role, coins, created_at) VALUES (?, ?, ?, ?, 'member', 50, NOW())");
-                $stmtIns->execute([$name, $email, $phone, $hash]);
+                $referred_by = isset($_POST['referred_by']) ? (int)$_POST['referred_by'] : null;
+                
+                $stmtIns = $pdo->prepare("INSERT INTO users (name, email, phone, password, role, referred_by, coins, created_at) VALUES (?, ?, ?, ?, 'member', ?, 0, NOW())");
+                $stmtIns->execute([$name, $email, $phone, $hash, $referred_by]);
                 $uid = $pdo->lastInsertId();
+                
+                // Award Welcome Bonus
+                awardCoins($pdo, $uid, 100, "Welcome Registration Bonus");
+                
+                // Award Referrer Bonus
+                if ($referred_by) {
+                    awardCoins($pdo, $referred_by, 50, "Member Referral Bonus (New Signup: $name)");
+                    sendNotification($pdo, $referred_by, "Referral Bonus!", "You earned 50 VooCoins because $name joined BizNexus using your link.", 'coins');
+                }
+                
                 $_SESSION["user_id"]=$uid;
                 $_SESSION["name"]=$name;
                 $_SESSION["email"]=$email;
@@ -72,16 +84,19 @@ input::placeholder{color:#333}
 <div class="coins-box">🪙 Get 100 VooCoins FREE on joining!</div>
 <?php if($errors): ?><div class="err"><?php foreach($errors as $e) echo "<div>• $e</div>"; ?></div><?php endif; ?>
 <form method="POST">
-<label>Full Name *</label>
-<input type="text" name="name" placeholder="Your full name" value="<?=htmlspecialchars($_POST["name"]??"")?>" required>
+    <?php if(isset($_GET['ref'])): ?>
+        <input type="hidden" name="referred_by" value="<?= (int)$_GET['ref'] ?>">
+    <?php endif; ?>
+<label><strong>Full Name *</strong></label>
+<input type="text" name="name" placeholder="Your full name" value="<?=htmlspecialchars($_POST["name"]??"")?>" pattern="[A-Za-z ]+" oninput="this.value = this.value.replace(/[^a-zA-Z ]/g, '')" maxlength="50" autocomplete="off" required>
 <label>Email Address *</label>
-<input type="email" name="email" placeholder="your@email.com" value="<?=htmlspecialchars($_POST["email"]??"")?>" required>
+<input type="email" name="email" placeholder="your@email.com" value="<?=htmlspecialchars($_POST["email"]??"")?>" maxlength="100" autocomplete="off" required>
 <label>Phone Number</label>
-<input type="tel" name="phone" placeholder="9876543210" value="<?=htmlspecialchars($_POST["phone"]??"")?>">
+<input type="tel" name="phone" placeholder="0000000000" value="<?=htmlspecialchars($_POST["phone"]??"")?>" oninput="this.value = this.value.replace(/[^0-9]/g, '')" maxlength="10" autocomplete="off">
 <label>Password *</label>
-<input type="password" name="password" placeholder="Minimum 6 characters" required>
+<input type="password" name="password" placeholder="Min 6 characters" maxlength="32" autocomplete="new-password" required>
 <label>Confirm Password *</label>
-<input type="password" name="confirm_password" placeholder="Repeat your password" required>
+<input type="password" name="confirm_password" placeholder="Repeat password" maxlength="32" autocomplete="new-password" required>
 <button type="submit" class="btn-gold">🚀 Create My Free Account</button>
 </form>
 <div class="link">Already a member? <a href="/auth/login.php">Login here</a></div>

@@ -13,9 +13,9 @@ $uStmt->execute([$uid]);
 $my_group_id = $uStmt->fetchColumn();
 
 // Fetch categories
-$cats = $pdo->query("SELECT DISTINCT category FROM public_leads WHERE category != '' ORDER BY category ASC")->fetchAll(PDO::FETCH_COLUMN);
+$cats = $pdo->query("SELECT name FROM categories ORDER BY name ASC")->fetchAll(PDO::FETCH_COLUMN);
 if (empty($cats)) {
-    $cats = ['Business Services', 'Construction', 'Digital Marketing', 'Education', 'Finance', 'Health & Wellness', 'Manufacturing', 'Real Estate', 'Retail', 'Technology', 'Transportation'];
+    $cats = ['Business Services', 'Construction', 'Digital Marketing', 'Education', 'Finance', 'Healthcare', 'Manufacturing', 'Real Estate', 'Retail', 'Technology'];
 }
 
 // Fetch group members (exclude self)
@@ -30,7 +30,7 @@ $success = ""; $error = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $cat = $_POST['category'] ?? '';
-    $receiver_id = (int)($_POST['receiver_id'] ?? 0);
+    $receiver_id = !empty($_POST['receiver_id']) ? (int)$_POST['receiver_id'] : null;
     $r_name = trim($_POST['r_name']);
     $r_phone = trim($_POST['r_phone']);
     $r_email = trim($_POST['r_email']);
@@ -51,9 +51,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $assigned_to_name = "Open Pool";
 
-            // If Open Pool selected, try to auto-match
-            if ($receiver_id === 0) {
-                $matchStmt = $pdo->prepare("SELECT id, name FROM users WHERE category = ? AND status = 'active' AND id != ? ORDER BY id ASC LIMIT 1");
+            // If Open Pool selected, try to auto-match (FAIRNESS)
+            if ($receiver_id === null) {
+                $matchStmt = $pdo->prepare("SELECT id, name FROM users WHERE category = ? AND status = 'active' AND id != ? ORDER BY last_lead_at ASC LIMIT 1");
                 $matchStmt->execute([$cat, $uid]);
                 $match = $matchStmt->fetch(PDO::FETCH_ASSOC);
                 
@@ -67,6 +67,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Direct referral
                 sendNotification($pdo, $receiver_id, "New Referral Received", "You received a new referral from " . $_SESSION['name'], 'referral');
             }
+            
+            // Economy Update: +50 VooCoins
+            awardCoins($pdo, $uid, 50, "Referral Submitted: " . $cat);
 
             $pdo->commit();
             header("Location: /referrals/list.php?sent=1");
@@ -114,12 +117,12 @@ require_once __DIR__ . '/../includes/layout_start.php';
 
                 <div class="col-md-6">
                     <label class="form-label" style="font-size:.8rem;color:#8888aa;">2. Referral Category *</label>
-                    <select name="category" id="category" class="form-select" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;padding:12px;border-radius:10px;" required>
-                        <option value="">-- Select Industry --</option>
+                    <input list="catList" name="category" id="category" class="form-control" placeholder="Search Industry (e.g. SEO, Pharma)" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;padding:12px;border-radius:10px;" required autocomplete="off">
+                    <datalist id="catList">
                         <?php foreach($cats as $c): ?>
-                            <option value="<?= htmlspecialchars($c) ?>"><?= htmlspecialchars($c) ?></option>
+                            <option value="<?= htmlspecialchars($c) ?>">
                         <?php endforeach; ?>
-                    </select>
+                    </datalist>
                 </div>
 
                 <div class="col-12"><hr style="border-color:#2a2a3a;margin:10px 0;"></div>
@@ -130,7 +133,7 @@ require_once __DIR__ . '/../includes/layout_start.php';
                 </div>
                 <div class="col-md-6">
                     <label class="form-label" style="font-size:.8rem;color:#8888aa;">Prospect Phone *</label>
-                    <input type="tel" name="r_phone" class="form-control" placeholder="+91 98765 43210" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;padding:12px;border-radius:10px;" required>
+                    <input type="tel" name="r_phone" class="form-control" placeholder="+91 00000 00000" style="background:#0d0d16;border:1px solid #2a2a3a;color:#fff;padding:12px;border-radius:10px;" required>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label" style="font-size:.8rem;color:#8888aa;">Prospect Email</label>
@@ -150,7 +153,7 @@ require_once __DIR__ . '/../includes/layout_start.php';
                     <button type="submit" style="width:100%;padding:14px;background:linear-gradient(135deg,#FFD700,#ff8c00);color:#000;border:none;border-radius:12px;font-weight:800;font-size:1rem;box-shadow:0 4px 15px rgba(255,215,0,0.2);">
                         🚀 Submit Referral
                     </button>
-                    <p style="text-align:center;font-size:.7rem;color:#666;margin-top:12px;">Sending a referral earns you 25 VooCoins and builds your Trust Score.</p>
+                    <p style="text-align:center;font-size:.7rem;color:#666;margin-top:12px;">Sending a referral earns you 50 VooCoins and builds your Trust Score.</p>
                 </div>
             </div>
         </form>

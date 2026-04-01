@@ -134,7 +134,9 @@ require_once __DIR__ . '/../includes/layout_start.php';
         <?php foreach ($p['features'] as $f): ?><li><?= htmlspecialchars($f) ?></li><?php endforeach; ?>
     </ul>
 </a>
-<?php endforeach; ?>
+<?php endforeach; ?><?php if ($order):
+    $coins = $billing_cycle === 'yearly' ? $plan_data['coins_yearly'] : $plan_data['coins_monthly'];
+?>
 </div>
 
 <!-- Order Error -->
@@ -143,89 +145,130 @@ require_once __DIR__ . '/../includes/layout_start.php';
 <?php endif; ?>
 
 <!-- Checkout Box -->
-<?php if ($order): $coins = $billing_cycle==='yearly' ? $plan_data['coins_yearly'] : $plan_data['coins_monthly']; ?>
 <div class="checkout-box">
-    <div style="font-weight:700;color:#e8e8f5;margin-bottom:16px;">📋 Order Summary</div>
-
-    <div class="order-row">
-        <span style="color:#8888aa;"><?= $plan_data['label'] ?> Plan</span>
-        <span style="color:#9090b8;font-size:.78rem;">(<?= $billing_cycle === 'yearly' ? '12 months' : '1 month' ?>)</span>
-    </div>
-    <div class="order-row">
-        <span style="color:#8888aa;">Rate</span>
-        <span style="color:#c0c0d8;">
-            <?= $billing_cycle === 'yearly' ? $plan_data['yearly_ppm'].' /mo' : $plan_data['monthly_ppm'].' /mo' ?>
-            <?php if ($billing_cycle === 'yearly'): ?>
-            <span style="text-decoration:line-through;color:#555577;margin-left:6px;"><?= $plan_data['monthly_ppm'] ?>/mo</span>
-            <?php endif; ?>
-        </span>
-    </div>
-    <?php if ($billing_cycle === 'yearly'): ?>
-    <div class="order-row">
-        <span style="color:#00e87a;">You Save 🎉</span>
-        <span style="color:#00e87a;font-weight:700;"><?= $plan_data['saving'] ?></span>
-    </div>
-    <?php endif; ?>
-    <div class="order-row">
-        <span style="color:#8888aa;">Bonus Coins</span>
-        <span style="color:#FFD700;font-weight:700;">+<?= $coins ?> 🪙</span>
-    </div>
-    <div class="order-row">
-        <span style="color:#e8e8f5;">Total <?= $billing_cycle === 'yearly' ? '(billed now)' : '' ?></span>
-        <span style="color:#FFD700;font-size:1.1rem;"><?= $billing_cycle === 'yearly' ? $plan_data['yearly_total'] : $plan_data['monthly_ppm'].'/mo' ?></span>
+    <!-- Coupon Box -->
+    <div style="background:rgba(255,215,0,0.03); border:1px solid rgba(255,215,0,0.15); border-radius:10px; padding:15px; margin-bottom:20px;">
+        <h6 style="color:#FFD700;font-size:.8rem;margin-bottom:10px;"><i class="fas fa-ticket-alt"></i> Have a Coupon Code?</h6>
+        <div class="input-group">
+            <input type="text" id="couponCode" class="form-control" style="background:#0d0d16; border-color:#2a2a3a; color:#fff; font-size:.85rem;" placeholder="e.g. H2H50">
+            <button type="button" class="btn btn-gold btn-sm" onclick="applyCoupon()">Apply</button>
+        </div>
+        <div id="couponMsg" style="font-size:.72rem;margin-top:6px;"></div>
     </div>
 
-    <button class="btn-pay" id="rzpButton">
-        🔐 Pay <?= $billing_cycle === 'yearly' ? $plan_data['yearly_total'] : $plan_data['monthly_ppm'] ?> with Razorpay
-    </button>
+    <div style="background:#0d0d16; border-radius:12px; padding:18px; border:1px solid #1e1e2e;">
+        <div class="order-row"><span>Plan Card</span> <span style="color:#FFD700;"><?= $plan_data['label'] ?></span></div>
+        <div class="order-row"><span>Billing Cycle</span> <span style="text-transform:capitalize;"><?= $billing_cycle ?></span></div>
+        <div class="order-row"><span>Original Amount</span> <span><?= $billing_cycle === 'yearly' ? $plan_data['yearly_total'] : $plan_data['monthly_ppm'] ?></span></div>
+        
+        <div id="discountRow" style="display:none;" class="order-row">
+            <span style="color:#00e87a;">Discount Applied</span> 
+            <span id="discountVal" style="color:#00e87a;font-weight:700;">-₹0</span>
+        </div>
+
+        <div class="order-row">
+            <span style="color:#8888aa;">Bonus Coins</span>
+            <span style="color:#FFD700;font-weight:700;">+<?= $coins ?> 🪙</span>
+        </div>
+
+        <hr style="border-color:#2a2a3a;margin:12px 0;">
+        <div class="order-row" style="font-size:1.1rem;font-weight:900;color:#fff;border:none;">
+            <span>Total Payable</span> 
+            <span id="totalDisplay"><?= $billing_cycle === 'yearly' ? $plan_data['yearly_total'] : $plan_data['monthly_ppm'] ?></span>
+        </div>
+    </div>
+
+    <button id="rzp-button1" class="btn-pay">🔐 Pay <span id="btnAmount"><?= $billing_cycle === 'yearly' ? $plan_data['yearly_total'] : $plan_data['monthly_ppm'] ?></span> with Razorpay</button>
 
     <div class="secure-row">
         <span>🔒 Secured by Razorpay</span>
         <span>🏢 BookAnEvent</span>
-        <span>🔐 256-bit SSL</span>
-        <span>✅ Instant Activation</span>
+        <span>📅 Event Support</span>
     </div>
+    <p style="font-size:.65rem; color:#555577; text-align:center; margin-top:14px; line-height:1.3;">
+        * BizNexus services (Digital B2B Networking, Website Consulting, and AI Group Meetings) are listed under <strong>Event Booking & Business Services</strong> via BookAnEvent.
+    </p>
 </div>
 
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
-document.getElementById('rzpButton').addEventListener('click', function() {
-    var options = {
-        key:         '<?= RAZORPAY_KEY_ID ?>',
-        amount:      '<?= $order['amount'] ?>',
-        currency:    'INR',
-        name:        'BizNexus',
-        description: '<?= $plan_data['label'] ?> Plan — <?= ucfirst($billing_cycle) ?>',
-        image:       'https://biznexus.in/assets/logo.png',
-        order_id:    '<?= $order['id'] ?>',
-        prefill: {
-            name:    '<?= htmlspecialchars($user['name']??'',ENT_QUOTES) ?>',
-            email:   '<?= htmlspecialchars($user['email']??'',ENT_QUOTES) ?>',
-            contact: '<?= htmlspecialchars($user['phone']??'',ENT_QUOTES) ?>'
-        },
-        theme: { color: '#FFD700' },
-        handler: function(response) {
-            var form = document.createElement('form');
-            form.method = 'POST';
-            form.action = '/api/payment_verify.php';
-            [
-                ['razorpay_payment_id', response.razorpay_payment_id],
-                ['razorpay_order_id',   response.razorpay_order_id],
-                ['razorpay_signature',  response.razorpay_signature],
-                ['plan',    '<?= $selected_plan ?>'],
-                ['billing', '<?= $billing_cycle ?>'],
-                ['duration','<?= $duration ?>']
-            ].forEach(function(f) {
-                var i = document.createElement('input');
-                i.type='hidden'; i.name=f[0]; i.value=f[1]; form.appendChild(i);
-            });
-            document.body.appendChild(form);
-            form.submit();
-        },
-        modal: { ondismiss: function(){ } }
-    };
-    new Razorpay(options).open();
-});
+var originalAmountPaise = <?= $order['amount'] ?>;
+var currentAmountPaise  = originalAmountPaise;
+var appliedCoupon = '';
+
+function applyCoupon() {
+    var code = document.getElementById('couponCode').value.trim();
+    if(!code) return;
+    var msgEl = document.getElementById('couponMsg');
+    msgEl.innerHTML = '<span style="color:#888;">Validating...</span>';
+
+    fetch('/api/validate_coupon.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'code=' + encodeURIComponent(code)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            appliedCoupon = code;
+            var discount = 0;
+            if(data.type === 'percentage') {
+                discount = Math.round(originalAmountPaise * (data.value / 100));
+            } else {
+                discount = data.value * 100;
+            }
+            currentAmountPaise = originalAmountPaise - discount;
+            if(currentAmountPaise < 100) currentAmountPaise = 100;
+
+            document.getElementById('discountRow').style.display = 'flex';
+            document.getElementById('discountVal').innerText = '-₹' + (discount/100).toLocaleString();
+            document.getElementById('totalDisplay').innerText = '₹' + (currentAmountPaise/100).toLocaleString();
+            document.getElementById('btnAmount').innerText = '₹' + (currentAmountPaise/100).toLocaleString();
+            msgEl.innerHTML = '<span style="color:#00e87a;">✅ ' + data.message + '</span>';
+        } else {
+            msgEl.innerHTML = '<span style="color:#ff4d6d;">❌ ' + data.error + '</span>';
+        }
+    });
+}
+
+document.getElementById('rzp-button1').onclick = function(e){
+    e.preventDefault();
+    var btn = this;
+    var originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparing Payment...';
+    btn.disabled = true;
+
+    // Fetch a FRESH Order ID with the applied coupon
+    fetch('/api/create_payment_order.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'plan=<?= $selected_plan ?>&billing=<?= $billing_cycle ?>&coupon=' + encodeURIComponent(appliedCoupon)
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(!data.success) {
+            alert("Payment Error: " + data.error);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            return;
+        }
+
+        // SUCCESS: Redirect to the Secure Bridge on BookAnEvent
+        var bridgeUrl = "https://www.bookanevent.in/pay_biznexus.php?";
+        bridgeUrl += "order_id=" + data.order_id;
+        bridgeUrl += "&amount=" + data.amount;
+        bridgeUrl += "&user_id=<?= $uid ?>";
+        bridgeUrl += "&plan=<?= $selected_plan ?>";
+        bridgeUrl += "&billing=<?= $billing_cycle ?>";
+        
+        window.location.href = bridgeUrl;
+    })
+    .catch(err => {
+        alert("System Error: Could not initiate payment.");
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
 </script>
 <?php endif; ?>
 

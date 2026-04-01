@@ -13,6 +13,28 @@ if (isset($_GET['cancel'])) {
     exit;
 }
 
+// Handle Completion
+if (isset($_GET['complete'])) {
+    $mid = (int)$_GET['complete'];
+    // Verify participation
+    $stmt = $pdo->prepare("SELECT * FROM meetings WHERE id=? AND (created_by=? OR attendee_id=?) AND status != 'completed'");
+    $stmt->execute([$mid, $uid, $uid]);
+    $meeting = $stmt->fetch();
+    
+    if ($meeting) {
+        $pdo->prepare("UPDATE meetings SET status='completed' WHERE id=?")->execute([$mid]);
+        
+        // Reward: Meeting Completed (+50 🪙 to BOTH)
+        awardCoins($pdo, $meeting['created_by'], 50, "B2B Meeting Completed: ID $mid");
+        awardCoins($pdo, $meeting['attendee_id'], 50, "B2B Meeting Completed: ID $mid");
+        
+        sendNotification($pdo, $meeting['created_by'], "Meeting Completed!", "You earned 50 VooCoins for completing your meeting.", 'coins');
+        sendNotification($pdo, $meeting['attendee_id'], "Meeting Completed!", "You earned 50 VooCoins for completing your meeting.", 'coins');
+    }
+    header("Location: list.php?msg=completed");
+    exit;
+}
+
 // Fetch user's meetings
 $stmt = $pdo->prepare("
     SELECT m.*, 
@@ -100,6 +122,7 @@ $meetings = $stmt->fetchAll();
                                     </td>
                                     <td class="pe-4 text-end">
                                         <?php if($m['status'] === 'scheduled'): ?>
+                                            <button class="btn btn-outline-success btn-sm" onclick="completeMeeting(<?= $m['id'] ?>)">Mark Done</button>
                                             <button class="btn btn-outline-danger btn-sm" onclick="cancelMeeting(<?= $m['id'] ?>)">Cancel</button>
                                         <?php endif; ?>
                                         <button class="btn btn-outline-gold btn-sm ms-1">Details</button>
@@ -118,8 +141,12 @@ $meetings = $stmt->fetchAll();
 <script>
 function cancelMeeting(id) {
     if(confirm('Are you sure you want to cancel this meeting?')) {
-        // Simple cancel logic could go here or to a separate handler
         window.location.href = 'list.php?cancel=' + id;
+    }
+}
+function completeMeeting(id) {
+    if(confirm('Mark this meeting as completed? Both parties will earn 50 VooCoins!')) {
+        window.location.href = 'list.php?complete=' + id;
     }
 }
 </script>

@@ -1,0 +1,9 @@
+<?php
+require_once __DIR__ . '/includes/db.php';
+function desc($pdo, $table) {
+    echo "--- DESCRIBE $table ---\n";
+    $stmt = $pdo->query("DESCRIBE $table");
+    print_r($stmt->fetchAll(PDO::FETCH_ASSOC));
+}
+desc($pdo, 'groups');
+desc($pdo, 'users');

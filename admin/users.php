@@ -30,6 +30,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pStmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
         $pStmt->execute([$hash, $target_id]);
         $message = "Password for User ID $target_id has been reset to: <strong>BizNexus@2026</strong>";
+    } elseif (isset($_POST['update_plan'])) {
+        $target_id = (int)$_POST['user_id'];
+        $new_plan = $_POST['new_plan'];
+        $pdo->prepare("UPDATE users SET plan = ? WHERE id = ?")->execute([$new_plan, $target_id]);
+        $message = "User ID $target_id plan updated to $new_plan.";
     }
 }
 
@@ -49,7 +54,7 @@ if (!empty($search)) {
 }
 
 // Fetch all members
-$query = "SELECT id, name, email, phone, business_name, category, city, plan, status, is_verified, created_at FROM users $where ORDER BY id DESC LIMIT $limit OFFSET $offset";
+$query = "SELECT id, name, email, phone, business_name, category, city, plan, status, is_verified, email_verified, created_at FROM users $where ORDER BY id DESC LIMIT $limit OFFSET $offset";
 $stmtUsers = $pdo->prepare($query);
 $stmtUsers->execute($params);
 $users = $stmtUsers->fetchAll();
@@ -128,7 +133,13 @@ $users = $stmtUsers->fetchAll();
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <?= htmlspecialchars($u['email']) ?><br>
+                                <?= htmlspecialchars($u['email']) ?>
+                                <?php if($u['email_verified']??0): ?>
+                                    <span style="color:#00ff88;font-size:0.75rem;">(Verified)</span>
+                                <?php else: ?>
+                                    <span style="color:#ffcc00;font-size:0.75rem;">(Unverified)</span>
+                                <?php endif; ?>
+                                <br>
                                 <?= htmlspecialchars($u['phone']) ?>
                             </td>
                             <td>
@@ -137,7 +148,12 @@ $users = $stmtUsers->fetchAll();
                             </td>
                             <td>
                                 <span style="color: <?= $u['status']=='active' ? '#00ff88' : '#ff4455' ?>"><?= ucfirst($u['status']) ?></span><br>
-                                <small><?= htmlspecialchars($u['plan']) ?></small>
+                                <select onchange="updatePlan(<?= $u['id'] ?>, this.value)" class="form-select form-select-sm bg-dark text-white border-0 mt-1" style="width:100px; font-size:0.7rem;">
+                                    <option value="free" <?= ($u['plan']=='free')?'selected':'' ?>>FREE</option>
+                                    <option value="silver" <?= ($u['plan']=='silver')?'selected':'' ?>>SILVER</option>
+                                    <option value="gold" <?= ($u['plan']=='gold')?'selected':'' ?>>GOLD</option>
+                                    <option value="platinum" <?= ($u['plan']=='platinum')?'selected':'' ?>>PLATINUM</option>
+                                </select>
                             </td>
                             <td>
                                 <div class="d-flex gap-2">
@@ -171,5 +187,15 @@ $users = $stmtUsers->fetchAll();
     </div>
 </div>
 
+<script>
+function updatePlan(userId, plan) {
+    if(!confirm("Change plan for Member ID " + userId + " to " + plan + "?")) return;
+    let f = document.createElement("form");
+    f.method = "POST";
+    f.innerHTML = `<input type="hidden" name="update_plan" value="1"><input type="hidden" name="user_id" value="${userId}"><input type="hidden" name="new_plan" value="${plan}">`;
+    document.body.appendChild(f);
+    f.submit();
+}
+</script>
 </body>
 </html>
